@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChimpaCast - Compartilhamento de Tela para o Bando</title>
-    <link rel="stylesheet" href="style.css?v=9.0">
+    <title>ChimpaCast</title>
+    <link rel="icon" type="image/x-icon" href="images/81_85271.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="images/81_85271.ico">
+    <link rel="stylesheet" href="style.css?v=10.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -21,7 +23,7 @@
             <!-- Título e tagline -->
             <div class="modal-header">
                 <h1 class="brand-title">Chimpa<span class="brand-accent">Cast</span></h1>
-                <p class="brand-tagline">Compartilhamento de tela em tempo real dos macaquitos brasileños 🍌</p>
+                <p class="brand-tagline">Compartilhamento de tela dos macaquitos brasileños 🍌</p>
             </div>
 
             <!-- Formulário -->
@@ -32,7 +34,7 @@
                 </div>
                 <div class="form-group">
                     <label for="room-input">Nome da Sala</label>
-                    <input type="text" id="room-input" placeholder="Ex: jogatina" value="principal" required maxlength="25">
+                    <input type="text" id="room-input" placeholder="Ex: jogatina" value="principal" required maxlength="25" disabled="true">
                 </div>
                 <div class="form-group">
                     <label for="password-input">Senha de Acesso</label>
@@ -43,7 +45,7 @@
             </form>
 
             <div class="modal-footer-note">
-                Desenvolvido por <strong>Lucas Alves</strong> • Use com responsabilidade.
+                Desenvolvido por <strong>Lucas Alves</strong>
             </div>
         </div>
     </div>
@@ -167,24 +169,7 @@
         <header class="app-header">
             <div class="header-left">
                 <div class="logo-badge">
-                    <span class="logo-chimpa-mini">
-                        <svg class="chimpa-logo-svg-sm" width="20" height="20" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M6 18C6 11.3726 11.3726 6 18 6C24.6274 6 30 11.3726 30 18" stroke="#818cf8" stroke-width="2.5" stroke-linecap="round"/>
-                            <rect x="4" y="14" width="4" height="8" rx="2" fill="#6366f1"/>
-                            <rect x="28" y="14" width="4" height="8" rx="2" fill="#6366f1"/>
-                            <circle cx="10" cy="18" r="3.5" fill="#475569"/><circle cx="10" cy="18" r="2" fill="#f472b6"/>
-                            <circle cx="26" cy="18" r="3.5" fill="#475569"/><circle cx="26" cy="18" r="2" fill="#f472b6"/>
-                            <ellipse cx="18" cy="18.5" rx="8" ry="7.5" fill="#334155"/>
-                            <ellipse cx="18" cy="21" rx="5.5" ry="4" fill="#fed7aa"/>
-                            <ellipse cx="16.5" cy="20.2" rx="0.7" ry="0.9" fill="#7c2d12"/><ellipse cx="19.5" cy="20.2" rx="0.7" ry="0.9" fill="#7c2d12"/>
-                            <path d="M15.5 22.5C16.5 23.8 19.5 23.8 20.5 22.5" stroke="#7c2d12" stroke-width="1.2" stroke-linecap="round"/>
-                            <ellipse cx="14.8" cy="16.2" rx="1.6" ry="1.9" fill="#0f172a"/><ellipse cx="21.2" cy="16.2" rx="1.6" ry="1.9" fill="#0f172a"/>
-                            <circle cx="15.3" cy="15.6" r="0.6" fill="#ffffff"/><circle cx="21.7" cy="15.6" r="0.6" fill="#ffffff"/>
-                            <path d="M6 20C6 24.5 10 26 14 26" stroke="#818cf8" stroke-width="1.8" stroke-linecap="round"/>
-                            <circle cx="15" cy="26" r="1.5" fill="#10b981"/>
-                        </svg>
-                    </span>
-                    <span class="logo-text">ChimpaCast</span>
+                    <span class="brand-title brand-title-header">Chimpa<span class="brand-accent">Cast</span></span>
                 </div>
                 <div class="room-pill">
                     <span class="room-icon">#</span>
@@ -349,6 +334,6 @@
         </footer>
     </div>
 
-    <script src="app.js?v=9.0"></script>
+    <script src="app.js?v=10.0"></script>
 </body>
 </html>
