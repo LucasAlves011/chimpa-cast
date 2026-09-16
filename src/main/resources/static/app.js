@@ -232,6 +232,22 @@ if (dom.btnCutoffOk && dom.cutoffModal) {
     });
 }
 
+// Alternar visibilidade da senha de acesso
+const togglePasswordBtn = document.getElementById('toggle-password-btn');
+const eyeIcon = document.getElementById('eye-icon');
+const eyeOffIcon = document.getElementById('eye-off-icon');
+
+if (togglePasswordBtn && dom.passwordInput) {
+    togglePasswordBtn.addEventListener('click', () => {
+        const isPassword = dom.passwordInput.getAttribute('type') === 'password';
+        dom.passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+        if (eyeIcon && eyeOffIcon) {
+            eyeIcon.classList.toggle('hidden', isPassword);
+            eyeOffIcon.classList.toggle('hidden', !isPassword);
+        }
+    });
+}
+
 // ==========================================
 // 1. Inicialização e Entrada na Sala
 // ==========================================
