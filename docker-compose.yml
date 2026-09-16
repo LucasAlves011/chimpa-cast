@@ -1,13 +1,13 @@
 services:
-  # Serviço da Aplicação Spring Boot StreamFlow (Produção)
-  prd-app-streamflow:
+  # Serviço da Aplicação Spring Boot ChimpaCast (Produção)
+  prd-app-chimpacast:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: streamflow_app_prd
+    container_name: chimpacast_app_prd
     restart: unless-stopped
     networks:
-      - prd-streamflow-network
+      - prd-chimpacast-network
     ports:
       - "${PORT:-8084}:8080"
     environment:
@@ -24,5 +24,5 @@ services:
       - TZ=America/Sao_Paulo
 
 networks:
-  prd-streamflow-network:
+  prd-chimpacast-network:
     external: true

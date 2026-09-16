@@ -1022,4 +1022,45 @@ body {
     color: var(--text-muted);
 }
 
+/* Identidade Visual ChimpaCast */
+.logo-chimpa {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 12px auto;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.15));
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.25);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
 
+.logo-chimpa:hover {
+    transform: scale(1.05) rotate(-3deg);
+    box-shadow: 0 0 28px rgba(99, 102, 241, 0.4);
+}
+
+.chimpa-logo-svg {
+    width: 44px;
+    height: 44px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.logo-chimpa-mini {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 50%;
+    margin-right: 4px;
+}
+
+.chimpa-logo-svg-sm {
+    width: 20px;
+    height: 20px;
+}

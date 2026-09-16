@@ -8,12 +8,12 @@ pipeline {
 
     environment {
         SPRING_PROFILES_ACTIVE = 'prd'
-        APP_ACCESS_PASSWORD = credentials('STREAMFLOW_ACCESS_PASSWORD')
-        APP_ADMIN_KEY = credentials('STREAMFLOW_ADMIN_KEY')
-        CLOUDFLARE_CALLS_APP_ID = credentials('STREAMFLOW_CF_APP_ID')
-        CLOUDFLARE_CALLS_APP_SECRET = credentials('STREAMFLOW_CF_APP_SECRET')
-        CLOUDFLARE_CALLS_ACCOUNT_ID = credentials('STREAMFLOW_CF_ACCOUNT_ID')
-        CLOUDFLARE_CALLS_ANALYTICS_TOKEN = credentials('STREAMFLOW_CF_ANALYTICS_TOKEN')
+        APP_ACCESS_PASSWORD = credentials('CHIMPACAST_ACCESS_PASSWORD')
+        APP_ADMIN_KEY = credentials('CHIMPACAST_ADMIN_KEY')
+        CLOUDFLARE_CALLS_APP_ID = credentials('CHIMPACAST_CF_APP_ID')
+        CLOUDFLARE_CALLS_APP_SECRET = credentials('CHIMPACAST_CF_APP_SECRET')
+        CLOUDFLARE_CALLS_ACCOUNT_ID = credentials('CHIMPACAST_CF_ACCOUNT_ID')
+        CLOUDFLARE_CALLS_ANALYTICS_TOKEN = credentials('CHIMPACAST_CF_ANALYTICS_TOKEN')
     }
 
     stages {
@@ -41,14 +41,14 @@ pipeline {
                         fi
 
                         echo "--- Garantindo que a rede externa exista ---"
-                        docker network create prd-streamflow-network || true
+                        docker network create prd-chimpacast-network || true
 
-                        echo "--- Parando containers antigos do StreamFlow PRD ---"
-                        ./docker-compose -p prd-streamflow stop prd-app-streamflow || true
-                        ./docker-compose -p prd-streamflow rm -f prd-app-streamflow || true
+                        echo "--- Parando containers antigos do ChimpaCast PRD ---"
+                        ./docker-compose -p prd-chimpacast stop prd-app-chimpacast || true
+                        ./docker-compose -p prd-chimpacast rm -f prd-app-chimpacast || true
 
                         echo "--- Subindo novos containers (Build + Deploy) ---"
-                        ./docker-compose -p prd-streamflow up -d --build
+                        ./docker-compose -p prd-chimpacast up -d --build
                     """
                 }
             }

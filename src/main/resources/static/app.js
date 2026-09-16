@@ -1,6 +1,6 @@
 /**
- * StreamFlow - Frontend WebRTC & WebSocket Client
- * Integração de alta performance com Cloudflare Calls e Spring Boot
+ * ChimpaCast - Frontend WebRTC & WebSocket Client
+ * Plataforma de compartilhamento de tela de alta performance para primatas
  */
 
 const state = {
@@ -8,7 +8,7 @@ const state = {
     username: '',
     room: 'principal',
     password: '',
-    sessionToken: sessionStorage.getItem('streamflow_token') || '',
+    sessionToken: sessionStorage.getItem('chimpacast_token') || sessionStorage.getItem('streamflow_token') || '',
     quotaAvailable: true,
     authFailed: false,
     ws: null,
@@ -296,8 +296,9 @@ dom.joinForm.addEventListener('submit', async (e) => {
 
         // Sucesso na autenticação: armazena APENAS o token opaco de sessão
         state.sessionToken = authData.token || '';
-        sessionStorage.setItem('streamflow_token', state.sessionToken);
-        sessionStorage.removeItem('streamflow_pwd'); // Garante que a senha mestre nunca fique armazenada
+        sessionStorage.setItem('chimpacast_token', state.sessionToken);
+        sessionStorage.removeItem('streamflow_token');
+        sessionStorage.removeItem('streamflow_pwd');
     } catch (err) {
         console.error("Erro na validação de login:", err);
         showJoinError("Não foi possível validar as credenciais com o servidor. Verifique se o backend está ativo.");
@@ -376,6 +377,7 @@ function connectWebSocket() {
             state.authFailed = true;
             state.sessionToken = '';
             state.password = '';
+            sessionStorage.removeItem('chimpacast_token');
             sessionStorage.removeItem('streamflow_token');
             sessionStorage.removeItem('streamflow_pwd');
             dom.modal.classList.remove('hidden');
@@ -495,6 +497,7 @@ async function handleWsMessage(msg) {
             state.authFailed = true;
             state.sessionToken = '';
             state.password = '';
+            sessionStorage.removeItem('chimpacast_token');
             sessionStorage.removeItem('streamflow_token');
             sessionStorage.removeItem('streamflow_pwd');
             if (state.ws) {

@@ -14,8 +14,8 @@
     <groupId>com.screenshare</groupId>
     <artifactId>screen-share-server</artifactId>
     <version>1.0.0</version>
-    <name>screen-share-server</name>
-    <description>Servidor de Compartilhamento de Tela em Alta Performance com Cloudflare Calls</description>
+    <name>ChimpaCast</name>
+    <description>ChimpaCast - Plataforma de Compartilhamento de Tela em Alta Performance para Primatas</description>
 
     <properties>
         <java.version>21</java.version>
