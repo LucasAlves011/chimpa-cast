@@ -78,14 +78,25 @@ body {
 }
 
 .modal-header .logo-icon svg {
-    width: 28px;
-    height: 28px;
+    width: 32px !important;
+    height: 32px !important;
+    max-width: 32px;
+    max-height: 32px;
 }
 
-/* Utilitários de Ícones SVG */
+/* Utilitários Globais de Ícones SVG */
+svg {
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+
 .svg-icon {
-    width: 18px;
-    height: 18px;
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px;
+    min-height: 18px;
+    max-width: 18px;
+    max-height: 18px;
     stroke-width: 2;
     stroke: currentColor;
     fill: none;
@@ -93,16 +104,73 @@ body {
     stroke-linejoin: round;
     display: inline-block;
     vertical-align: middle;
+    flex-shrink: 0;
 }
 
 .svg-icon-sm {
-    width: 14px;
-    height: 14px;
+    width: 14px !important;
+    height: 14px !important;
+    min-width: 14px;
+    min-height: 14px;
+    max-width: 14px;
+    max-height: 14px;
+    flex-shrink: 0;
 }
 
 .svg-icon-lg {
-    width: 24px;
-    height: 24px;
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px;
+    min-height: 24px;
+    max-width: 24px;
+    max-height: 24px;
+    flex-shrink: 0;
+}
+
+/* Contêineres de Ícones */
+.btn-icon,
+.avatar-icon,
+.title-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.btn-icon svg,
+.control-btn svg,
+.icon-btn svg {
+    width: 18px !important;
+    height: 18px !important;
+    max-width: 18px;
+    max-height: 18px;
+    flex-shrink: 0;
+}
+
+.estimate-item span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.estimate-item svg {
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px;
+    min-height: 16px;
+    max-width: 16px;
+    max-height: 16px;
+    flex-shrink: 0;
+}
+
+.modal-footer-actions svg {
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px;
+    min-height: 16px;
+    max-width: 16px;
+    max-height: 16px;
+    flex-shrink: 0;
 }
 
 .modal-header h2 {
@@ -1043,8 +1111,11 @@ body {
 }
 
 .chimpa-logo-svg {
-    width: 44px;
-    height: 44px;
+    width: 44px !important;
+    height: 44px !important;
+    max-width: 44px;
+    max-height: 44px;
+    flex-shrink: 0;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
@@ -1057,10 +1128,14 @@ body {
     background: rgba(99, 102, 241, 0.15);
     border: 1px solid rgba(99, 102, 241, 0.3);
     border-radius: 50%;
-    margin-right: 4px;
+    margin-right: 6px;
+    flex-shrink: 0;
 }
 
 .chimpa-logo-svg-sm {
-    width: 20px;
-    height: 20px;
+    width: 20px !important;
+    height: 20px !important;
+    max-width: 20px;
+    max-height: 20px;
+    flex-shrink: 0;
 }

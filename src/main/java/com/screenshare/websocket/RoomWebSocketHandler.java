@@ -64,6 +64,10 @@ public class RoomWebSocketHandler extends TextWebSocketHandler {
         return new ActiveRoomStats(totalScreens, totalViewers, totalBytesPerSec);
     }
 
+    public boolean hasActiveScreens() {
+        return roomScreens.values().stream().anyMatch(screens -> !screens.isEmpty());
+    }
+
     public void broadcastQuotaUpdate(Map<String, Object> quotaData) {
         try {
             Map<String, Object> msg = new HashMap<>(quotaData);

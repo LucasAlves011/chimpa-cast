@@ -59,7 +59,7 @@ public class AuthHandshakeInterceptor implements HandshakeInterceptor {
         String credential = (token != null && !token.isBlank()) ? token : password;
 
         if (credential == null || !authService.isValidTokenOrPassword(credential)) {
-            log.warn("Handshake WebSocket rejeitado: credencial ausente ou inválida. URI: {}", uri.getPath());
+            log.info("Handshake WebSocket não autorizado (sessão ausente ou expirada): {}", uri.getPath());
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return false;
         }

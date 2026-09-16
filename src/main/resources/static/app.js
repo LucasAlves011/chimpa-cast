@@ -172,18 +172,18 @@ function updateQualityIndicator(qualityLabel, isActive = false) {
 
 function getVolumeSvg(vol, isMuted) {
     if (isMuted || vol === 0) {
-        return `<svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        return `<svg class="svg-icon svg-icon-sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
             <line x1="22" x2="16" y1="9" y2="15"/>
             <line x1="16" x2="22" y1="9" y2="15"/>
         </svg>`;
     } else if (vol < 0.5) {
-        return `<svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        return `<svg class="svg-icon svg-icon-sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
         </svg>`;
     } else {
-        return `<svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        return `<svg class="svg-icon svg-icon-sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
             <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
@@ -336,7 +336,31 @@ dom.joinForm.addEventListener('submit', async (e) => {
     fetchQuota();
 });
 
+let reconnectAttempts = 0;
+let wsConnectedSuccessfully = false;
+
+function handleSessionExpired(msg) {
+    state.authFailed = true;
+    state.sessionToken = '';
+    state.password = '';
+    sessionStorage.removeItem('chimpacast_token');
+    sessionStorage.removeItem('streamflow_token');
+    sessionStorage.removeItem('streamflow_pwd');
+    if (state.ws) {
+        try { state.ws.close(); } catch(e) {}
+    }
+    dom.modal.classList.remove('hidden');
+    dom.app.classList.add('hidden');
+    showJoinError(msg || "Sessão expirada. Faça login novamente.");
+}
+
 function connectWebSocket() {
+    if (!state.sessionToken && !state.password) {
+        console.warn("Nenhuma credencial disponível para WebSocket. Redirecionando para login.");
+        handleSessionExpired("Por favor, faça login para entrar na sala.");
+        return;
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const authQuery = state.sessionToken
         ? `?token=${encodeURIComponent(state.sessionToken)}`
@@ -344,11 +368,13 @@ function connectWebSocket() {
     const wsUrl = `${protocol}//${window.location.host}/ws/rooms${authQuery}`;
 
     dom.statusText.textContent = "Conectando...";
+    wsConnectedSuccessfully = false;
     state.ws = new WebSocket(wsUrl);
 
     state.ws.onopen = () => {
+        reconnectAttempts = 0;
+        wsConnectedSuccessfully = true;
         dom.statusText.textContent = "Conectado";
-        // Envia mensagem para entrar na sala com token de sessão seguro
         sendWs({
             type: 'JOIN_ROOM',
             room: state.room,
@@ -368,27 +394,38 @@ function connectWebSocket() {
         }
     };
 
-    state.ws.onclose = (event) => {
+    state.ws.onclose = async (event) => {
         dom.statusText.textContent = "Desconectado";
         
-        // Se a conexão foi rejeitada pelo servidor por falha de autenticação (4001, 1003 ou 1008/1000 com erro)
+        // Se a conexão foi rejeitada por falha explícita de autenticação
         if (event.code === 4001 || event.code === 1003 || event.code === 1008 || state.authFailed) {
-            console.warn("WebSocket rejeitado por falha de autenticação. Interrompendo reconexões.");
-            state.authFailed = true;
-            state.sessionToken = '';
-            state.password = '';
-            sessionStorage.removeItem('chimpacast_token');
-            sessionStorage.removeItem('streamflow_token');
-            sessionStorage.removeItem('streamflow_pwd');
-            dom.modal.classList.remove('hidden');
-            dom.app.classList.add('hidden');
-            showJoinError("Acesso rejeitado: sessão expirada ou inválida! Por favor, entre novamente.");
+            handleSessionExpired("Acesso rejeitado: sessão expirada ou inválida! Por favor, entre novamente.");
+            return;
+        }
+
+        // Se falhou antes de conectar (handshake 401 vira 1006 no navegador), checa via HTTP se a sessão ainda existe
+        if (!wsConnectedSuccessfully || event.code === 1006) {
+            try {
+                const checkRes = await fetchWithAuth('/api/quota');
+                if (checkRes.status === 401) {
+                    console.warn("Sessão invalidada no backend. Interrompendo reconexões WebSocket.");
+                    handleSessionExpired("Sua sessão expirou ou o servidor foi reiniciado. Por favor, faça login novamente.");
+                    return;
+                }
+            } catch (netErr) {
+                // Erro de rede genérico, continua com a rotina de reconexão
+            }
+        }
+
+        reconnectAttempts++;
+        if (reconnectAttempts > 4) {
+            handleSessionExpired("Não foi possível restabelecer conexão com o servidor. Por favor, entre novamente.");
             return;
         }
 
         // Reconecta apenas se o usuário estiver autenticado e na tela da sala
         if (dom.modal.classList.contains('hidden') && (state.sessionToken || state.password) && !state.authFailed) {
-            console.warn("WebSocket desconectado. Tentando reconectar em 3s...");
+            console.warn(`WebSocket desconectado. Tentativa de reconexão ${reconnectAttempts}/4 em 3s...`);
             setTimeout(() => {
                 if (dom.modal.classList.contains('hidden') && (state.sessionToken || state.password) && !state.authFailed) {
                     connectWebSocket();
@@ -792,7 +829,7 @@ function renderScreenCard(userId, username, stream, isMuted = false) {
             <video autoplay playsinline ${isMuted ? 'muted' : ''}></video>
             <div class="screen-overlay">
                 <div class="screen-tag">
-                    <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg class="svg-icon svg-icon-sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect width="20" height="14" x="2" y="3" rx="2"/>
                         <line x1="8" x2="16" y1="21" y2="21"/>
                         <line x1="12" x2="12" y1="17" y2="21"/>
@@ -810,7 +847,7 @@ function renderScreenCard(userId, username, stream, isMuted = false) {
                         <div class="screen-tag" style="font-size: 11px; opacity: 0.8;">(Você)</div>
                     `}
                     <button class="screen-btn focus-btn" title="Tela Cheia">
-                        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg class="svg-icon svg-icon-sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
                         </svg>
                     </button>
@@ -1132,7 +1169,7 @@ if (closeQuotaModalBtn && quotaModal) {
 }
 
 const syncSvgIcon = `
-    <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <svg class="svg-icon svg-icon-sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>
     </svg>
 `;

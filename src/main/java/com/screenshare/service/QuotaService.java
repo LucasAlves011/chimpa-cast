@@ -104,8 +104,21 @@ public class QuotaService {
 
     /**
      * A cada 3 minutos, sincroniza com a API GraphQL oficial da Cloudflare
+     * APENAS se houver pelo menos um usuário transmitindo tela no momento.
      */
     @Scheduled(fixedRate = 180000)
+    public void scheduledSyncWithCloudflare() {
+        if (!roomWebSocketHandler.hasActiveScreens()) {
+            log.debug("Sincronização com Cloudflare ignorada: nenhuma tela ativa no momento.");
+            return;
+        }
+        syncWithCloudflareGraphQL();
+    }
+
+    /**
+     * Executa a sincronização direta com a API GraphQL da Cloudflare.
+     * Usado na inicialização, no botão manual do usuário ou pelo scheduler ativo.
+     */
     public boolean syncWithCloudflareGraphQL() {
         if (accountId == null || accountId.isBlank() || analyticsToken == null || analyticsToken.isBlank()) {
             return false;
