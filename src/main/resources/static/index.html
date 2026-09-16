@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ChimpaCast - Compartilhamento de Tela para o Bando</title>
-    <link rel="stylesheet" href="style.css?v=6.0">
+    <link rel="stylesheet" href="style.css?v=9.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -12,14 +12,19 @@
 <body>
     <!-- Modal Inicial de Entrada na Sala -->
     <div id="join-modal" class="modal-overlay">
-        <div class="modal-card">
-            <div class="modal-header">
-                <div class="login-logo-wrapper">
-                    <img src="images/logo_login.png" alt="ChimpaCast" class="login-logo-img">
-                </div>
-                <h1 class="brand-title">Chimpa<span class="brand-accent">Cast</span></h1>
-                <p class="brand-tagline">Compartilhamento de tela em tempo real para o bando 🍌</p>
+        <div class="modal-card modal-login">
+            <!-- Imagem hero: grande, sem borda preta, destaque total -->
+            <div class="login-logo-wrapper">
+                <img src="images/logo_login.png?v=9.0" alt="ChimpaCast" class="login-logo-img">
             </div>
+
+            <!-- Título e tagline -->
+            <div class="modal-header">
+                <h1 class="brand-title">Chimpa<span class="brand-accent">Cast</span></h1>
+                <p class="brand-tagline">Compartilhamento de tela em tempo real dos macaquitos brasileños 🍌</p>
+            </div>
+
+            <!-- Formulário -->
             <form id="join-form">
                 <div class="form-group">
                     <label for="username-input">Seu Nickname</label>
@@ -36,11 +41,13 @@
                 <div id="join-error-msg" class="auth-error-msg hidden"></div>
                 <button type="submit" class="btn btn-primary btn-block">Entrar na Sala</button>
             </form>
+
             <div class="modal-footer-note">
                 Desenvolvido por <strong>Lucas Alves</strong> • Use com responsabilidade.
             </div>
         </div>
     </div>
+
 
     <!-- Modal de Detalhes do Uso da Sala -->
     <div id="quota-modal" class="modal-overlay hidden">
@@ -342,6 +349,6 @@
         </footer>
     </div>
 
-    <script src="app.js?v=6.0"></script>
+    <script src="app.js?v=9.0"></script>
 </body>
 </html>
