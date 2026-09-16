@@ -861,6 +861,18 @@ function renderScreenCard(userId, username, stream, isMuted = false) {
         const video = card.querySelector('video');
         video.srcObject = stream;
 
+        // Ajuste dinâmico de proporção para eliminar bordas pretas (Letterbox/Pillarbox)
+        const updateAspectRatio = () => {
+            if (video.videoWidth && video.videoHeight) {
+                card.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+            }
+        };
+        video.addEventListener('loadedmetadata', updateAspectRatio);
+        video.addEventListener('resize', updateAspectRatio);
+        if (video.videoWidth && video.videoHeight) {
+            updateAspectRatio();
+        }
+
         const focusBtn = card.querySelector('.focus-btn');
         focusBtn.addEventListener('click', () => {
             if (document.fullscreenElement) {
@@ -903,6 +915,16 @@ function renderScreenCard(userId, username, stream, isMuted = false) {
     } else {
         const video = card.querySelector('video');
         video.srcObject = stream;
+        const updateAspectRatio = () => {
+            if (video.videoWidth && video.videoHeight) {
+                card.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+            }
+        };
+        video.addEventListener('loadedmetadata', updateAspectRatio);
+        video.addEventListener('resize', updateAspectRatio);
+        if (video.videoWidth && video.videoHeight) {
+            updateAspectRatio();
+        }
     }
 }
 

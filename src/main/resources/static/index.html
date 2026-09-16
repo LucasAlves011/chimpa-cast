@@ -4,49 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ChimpaCast - Compartilhamento de Tela para o Bando</title>
-    <link rel="stylesheet" href="style.css?v=5.0">
+    <link rel="stylesheet" href="style.css?v=6.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
     <!-- Modal Inicial de Entrada na Sala -->
     <div id="join-modal" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-header">
-                <div class="logo-icon logo-chimpa">
-                    <svg class="chimpa-logo-svg" width="44" height="44" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <!-- Headset Band -->
-                        <path d="M6 18C6 11.3726 11.3726 6 18 6C24.6274 6 30 11.3726 30 18" stroke="#818cf8" stroke-width="2.5" stroke-linecap="round"/>
-                        <!-- Headset Cups -->
-                        <rect x="4" y="14" width="4" height="8" rx="2" fill="#6366f1"/>
-                        <rect x="28" y="14" width="4" height="8" rx="2" fill="#6366f1"/>
-                        <!-- Monkey Ears -->
-                        <circle cx="10" cy="18" r="3.5" fill="#475569"/>
-                        <circle cx="10" cy="18" r="2" fill="#f472b6"/>
-                        <circle cx="26" cy="18" r="3.5" fill="#475569"/>
-                        <circle cx="26" cy="18" r="2" fill="#f472b6"/>
-                        <!-- Monkey Head -->
-                        <ellipse cx="18" cy="18.5" rx="8" ry="7.5" fill="#334155"/>
-                        <!-- Snout / Face area -->
-                        <ellipse cx="18" cy="21" rx="5.5" ry="4" fill="#fed7aa"/>
-                        <!-- Nostrils -->
-                        <ellipse cx="16.5" cy="20.2" rx="0.7" ry="0.9" fill="#7c2d12"/>
-                        <ellipse cx="19.5" cy="20.2" rx="0.7" ry="0.9" fill="#7c2d12"/>
-                        <!-- Smiling Mouth -->
-                        <path d="M15.5 22.5C16.5 23.8 19.5 23.8 20.5 22.5" stroke="#7c2d12" stroke-width="1.2" stroke-linecap="round"/>
-                        <!-- Eyes -->
-                        <ellipse cx="14.8" cy="16.2" rx="1.6" ry="1.9" fill="#0f172a"/>
-                        <ellipse cx="21.2" cy="16.2" rx="1.6" ry="1.9" fill="#0f172a"/>
-                        <circle cx="15.3" cy="15.6" r="0.6" fill="#ffffff"/>
-                        <circle cx="21.7" cy="15.6" r="0.6" fill="#ffffff"/>
-                        <!-- Headset Microphone -->
-                        <path d="M6 20C6 24.5 10 26 14 26" stroke="#818cf8" stroke-width="1.8" stroke-linecap="round"/>
-                        <circle cx="15" cy="26" r="1.5" fill="#10b981"/>
-                    </svg>
+                <div class="login-logo-wrapper">
+                    <img src="images/logo_login.png" alt="ChimpaCast" class="login-logo-img">
                 </div>
-                <h2>ChimpaCast</h2>
-                <p>Compartilhamento de tela em tempo real para o bando.</p>
+                <h1 class="brand-title">Chimpa<span class="brand-accent">Cast</span></h1>
+                <p class="brand-tagline">Compartilhamento de tela em tempo real para o bando 🍌</p>
             </div>
             <form id="join-form">
                 <div class="form-group">
@@ -327,13 +299,18 @@
                     <span class="btn-label" id="share-btn-text">Compartilhar Tela</span>
                 </button>
 
-                <!-- Seletor de Qualidade -->
+                <!-- Seletor de Qualidade com Seta Customizada Elegante -->
                 <div class="quality-selector-wrapper">
                     <select id="quality-select" class="select-input" title="Qualidade da Transmissão">
                         <option value="1080p60" selected>1080p 60fps (Fluido)</option>
                         <option value="1080p30">1080p 30fps (Padrão)</option>
                         <option value="720p60">720p 60fps (Econômico)</option>
                     </select>
+                    <span class="select-arrow" aria-hidden="true">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </span>
                 </div>
             </div>
 
@@ -365,6 +342,6 @@
         </footer>
     </div>
 
-    <script src="app.js?v=5.0"></script>
+    <script src="app.js?v=6.0"></script>
 </body>
 </html>
