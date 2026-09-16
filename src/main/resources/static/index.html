@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamFlow - Compartilhamento de Tela Ultra Rápido</title>
+    <link rel="stylesheet" href="style.css?v=3.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Modal Inicial de Entrada na Sala -->
+    <div id="join-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="logo-icon">
+                    <svg class="svg-icon svg-icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect width="20" height="14" x="2" y="3" rx="2"/>
+                        <line x1="8" x2="16" y1="21" y2="21"/>
+                        <line x1="12" x2="12" y1="17" y2="21"/>
+                    </svg>
+                </div>
+                <h2>Entrar na Transmissão</h2>
+                <p>Compartilhe sua tela em tempo real com alta definição.</p>
+            </div>
+            <form id="join-form">
+                <div class="form-group">
+                    <label for="username-input">Seu Nickname</label>
+                    <input type="text" id="username-input" placeholder="Ex: Lucas" required maxlength="20" autofocus>
+                </div>
+                <div class="form-group">
+                    <label for="room-input">Nome da Sala</label>
+                    <input type="text" id="room-input" placeholder="Ex: jogatina" value="principal" required maxlength="25">
+                </div>
+                <div class="form-group">
+                    <label for="password-input">Senha de Acesso</label>
+                    <input type="password" id="password-input" placeholder="Digite a senha da plataforma" required>
+                </div>
+                <div id="join-error-msg" class="auth-error-msg hidden"></div>
+                <button type="submit" class="btn btn-primary btn-block">Entrar na Sala</button>
+            </form>
+            <div class="modal-footer-note">
+                Desenvolvido por <strong>Lucas Alves</strong> • Use com responsabilidade.
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Detalhes do Uso da Sala -->
+    <div id="quota-modal" class="modal-overlay hidden">
+        <div class="modal-card modal-quota">
+            <div class="modal-header">
+                <div class="modal-header-row">
+                    <div class="modal-title-group">
+                        <span class="title-icon">
+                            <svg class="svg-icon svg-icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 3v18h18"/>
+                                <path d="m19 9-5 5-4-4-3 3"/>
+                            </svg>
+                        </span>
+                        <h2>Uso da Plataforma</h2>
+                    </div>
+                    <button id="close-quota-modal" class="icon-close-btn" title="Fechar">&times;</button>
+                </div>
+                <p id="modal-quota-month">Mês Atual: Setembro/2026</p>
+            </div>
+
+            <div class="quota-modal-body">
+                <!-- Barra de progresso destacada -->
+                <div class="modal-progress-section">
+                    <div class="flex-between">
+                        <span class="label">Saldo Restante:</span>
+                        <span id="modal-quota-pct" class="modal-pct-highlight">99.9%</span>
+                    </div>
+                    <div class="modal-progress-bar-bg">
+                        <div id="modal-quota-bar-fill" class="quota-bar-fill green" style="width: 100%;"></div>
+                    </div>
+                    <div class="flex-between subtext">
+                        <span>0 GB</span>
+                        <span id="modal-quota-remaining-label" class="remaining-highlight">999,38 GB livres</span>
+                        <span>1.000 GB</span>
+                    </div>
+                </div>
+
+                <!-- Estatísticas em Grade (3 caixas balanceadas, sem termos de cobrança técnica) -->
+                <div class="quota-stats-grid">
+                    <div class="quota-stat-box">
+                        <span class="stat-title">Consumido no Mês</span>
+                        <span id="modal-used-gb" class="stat-value">0,62 GB</span>
+                        <span id="modal-used-mb" class="stat-sub">(615 MB)</span>
+                    </div>
+                    <div class="quota-stat-box">
+                        <span class="stat-title">Franquia Mensal</span>
+                        <span class="stat-value">1.000 GB</span>
+                        <span class="stat-sub">Disponível no Mês</span>
+                    </div>
+                    <div class="quota-stat-box">
+                        <span class="stat-title">Transmissão ao Vivo</span>
+                        <span id="modal-live-rate" class="stat-value">0.0 GB/h</span>
+                        <span id="modal-active-viewers" class="stat-sub">0 espectadores</span>
+                    </div>
+                </div>
+
+                <!-- Estimativas de Horas -->
+                <div class="quota-estimate-box">
+                    <h4>Estimativa com o Saldo Livre:</h4>
+                    <div class="estimate-item">
+                        <span>
+                            <svg class="svg-icon svg-icon-sm" style="margin-right: 4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="6" x2="10" y1="12" y2="12"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="15" x2="15.01" y1="13" y2="13"/><line x1="18" x2="18.01" y1="11" y2="11"/><rect width="20" height="12" x="2" y="6" rx="6"/>
+                            </svg>
+                            Modo Jogos (1080p @ 60 FPS):
+                        </span>
+                        <span id="modal-est-60fps" class="estimate-highlight">~92 horas</span>
+                    </div>
+                    <div class="estimate-item">
+                        <span>
+                            <svg class="svg-icon svg-icon-sm" style="margin-right: 4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" x2="7" y1="2" y2="22"/><line x1="17" x2="17" y1="2" y2="22"/><line x1="2" x2="22" y1="12" y2="12"/><line x1="2" x2="7" y1="7" y2="7"/><line x1="2" x2="7" y1="17" y2="17"/><line x1="17" x2="22" y1="17" y2="17"/><line x1="17" x2="22" y1="7" y2="7"/>
+                            </svg>
+                            Modo Geral (1080p @ 30 FPS):
+                        </span>
+                        <span id="modal-est-30fps" class="estimate-highlight">~185 horas</span>
+                    </div>
+                </div>
+
+                <!-- Botão de Sincronizar Informações -->
+                <div class="modal-footer-actions">
+                    <button id="btn-sync-cloudflare" class="btn btn-secondary btn-block">
+                        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>
+                        </svg>
+                        Sincronizar Informações
+                    </button>
+                    <span id="sync-status-msg" class="sync-status-text">Atualizado automaticamente a cada 3 minutos</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Emergência: Limite de Franquia (Kill-Switch) -->
+    <div id="cutoff-modal" class="modal-overlay hidden" style="z-index: 9999;">
+        <div class="modal-card modal-cutoff">
+            <div class="modal-header">
+                <div class="cutoff-icon">
+                    <svg class="svg-icon svg-icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>
+                    </svg>
+                </div>
+                <h2 style="color: var(--danger); margin-bottom: 8px;">Transmissões Interrompidas</h2>
+                <p id="cutoff-reason-text">O limite de segurança da franquia gratuita da sala (990 GB) foi atingido. As transmissões foram encerradas preventivamente para garantir <strong>custo zero absoluto</strong> até a renovação no dia 1º do próximo mês.</p>
+            </div>
+            <div class="cutoff-badge-box">
+                <span class="badge-cost">100% Gratuito Garantido</span>
+                <span class="badge-sub">Kill-Switch de proteção ativado.</span>
+            </div>
+            <button id="btn-cutoff-ok" class="btn btn-danger btn-block" style="margin-top: 20px;">Entendido</button>
+        </div>
+    </div>
+
+    <!-- Aplicação Principal -->
+    <div id="app" class="app-container hidden">
+        <!-- Barra Superior -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="logo-badge">
+                    <span class="logo-dot"></span>
+                    <span class="logo-text">StreamFlow</span>
+                </div>
+                <div class="room-pill">
+                    <span class="room-icon">#</span>
+                    <span id="display-room-name">principal</span>
+                </div>
+            </div>
+
+            <div class="header-center">
+                <!-- Widget de Franquia Mensal -->
+                <div id="quota-widget" class="quota-widget" title="Clique para detalhes do saldo da sala">
+                    <div class="quota-text-row">
+                        <span class="quota-label">Franquia:</span>
+                        <span id="quota-percent" class="quota-value">--%</span>
+                        <span id="quota-remaining" class="quota-sub">(Carregando...)</span>
+                    </div>
+                    <div class="quota-bar-bg">
+                        <div id="quota-bar-fill" class="quota-bar-fill green" style="width: 100%;"></div>
+                    </div>
+                </div>
+
+                <div id="quality-pill" class="info-pill" title="Qualidade da transmissão">
+                    <span id="quality-dot" class="pill-dot gray"></span>
+                    <span id="quality-text">Pronto (1080p 60fps)</span>
+                </div>
+                <div id="status-pill" class="info-pill">
+                    <span id="status-text">Conectado</span>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <button id="toggle-chat-btn" class="icon-btn" title="Alternar Chat">
+                    <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>
+                    </svg>
+                    <span id="unread-badge" class="badge hidden">0</span>
+                </button>
+                <div class="user-pill">
+                    <span class="avatar-icon">
+                        <svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="8" r="5"/>
+                            <path d="M20 21a8 8 0 1 0-16 0"/>
+                        </svg>
+                    </span>
+                    <span id="display-username">Usuário</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Banner de Alerta Preventivo de Franquia (90%) -->
+        <div id="quota-warning-banner" class="quota-warning-banner hidden">
+            <div class="banner-content">
+                <span class="warning-icon">
+                    <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                        <line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>
+                    </svg>
+                </span>
+                <span id="warning-banner-text">
+                    <strong>Atenção:</strong> A franquia mensal da sala atingiu 90% (900 GB). O corte preventivo automático ocorrerá aos 990 GB para garantir custo zero.
+                </span>
+            </div>
+            <button id="close-warning-banner" class="icon-close-btn" title="Fechar Aviso">&times;</button>
+        </div>
+
+        <!-- Corpo Principal: Grade de Telas e Chat -->
+        <main class="app-body">
+            <!-- Área de Vídeo / Telas -->
+            <section class="stage-container">
+                <!-- Estado Vazio (Nenhuma transmissão ativa) -->
+                <div id="empty-state" class="empty-state">
+                    <div class="empty-icon">
+                        <svg class="svg-icon svg-icon-lg" style="width: 48px; height: 48px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect width="20" height="14" x="2" y="3" rx="2"/>
+                            <line x1="8" x2="16" y1="21" y2="21"/>
+                            <line x1="12" x2="12" y1="17" y2="21"/>
+                        </svg>
+                    </div>
+                    <h3>Nenhuma tela sendo transmitida no momento</h3>
+                    <p>Clique no botão abaixo para compartilhar sua tela em tempo real.</p>
+                    <button id="empty-share-btn" class="btn btn-primary">
+                        Compartilhar Minha Tela
+                    </button>
+                </div>
+
+                <!-- Grade Dinâmica de Telas -->
+                <div id="screens-grid" class="screens-grid hidden">
+                    <!-- Cards de vídeo serão inseridos dinamicamente aqui -->
+                </div>
+            </section>
+
+            <!-- Painel Lateral de Chat -->
+            <aside id="chat-sidebar" class="chat-sidebar">
+                <div class="chat-header">
+                    <h4>Chat da Sala</h4>
+                    <span id="participant-count" class="badge">1 online</span>
+                </div>
+                <div id="chat-messages" class="chat-messages">
+                    <div class="chat-system-msg">Bem-vindo à sala! Compartilhe o link com seus amigos.</div>
+                </div>
+                <form id="chat-form" class="chat-input-container">
+                    <input type="text" id="chat-input" placeholder="Envie uma mensagem..." autocomplete="off">
+                    <button type="submit" class="btn btn-send">Enviar</button>
+                </form>
+            </aside>
+        </main>
+
+        <!-- Barra Inferior de Controles (Estilo Discord) -->
+        <footer class="controls-bar">
+            <div class="controls-group">
+                <!-- Botão de Compartilhar Tela -->
+                <button id="share-btn" class="control-btn">
+                    <span class="btn-icon">
+                        <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3"/>
+                            <path d="M8 21h8"/><path d="M12 17v4"/>
+                            <path d="m17 8 5-5"/><path d="M17 3h5v5"/>
+                        </svg>
+                    </span>
+                    <span class="btn-label" id="share-btn-text">Compartilhar Tela</span>
+                </button>
+
+                <!-- Seletor de Qualidade -->
+                <div class="quality-selector-wrapper">
+                    <select id="quality-select" class="select-input" title="Qualidade da Transmissão">
+                        <option value="1080p60" selected>1080p 60fps (Fluido)</option>
+                        <option value="1080p30">1080p 30fps (Padrão)</option>
+                        <option value="720p60">720p 60fps (Econômico)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Nota de Autoria e Responsabilidade no Rodapé -->
+            <div class="footer-center-attribution">
+                Desenvolvido por <strong>Lucas Alves</strong> • Use com responsabilidade
+            </div>
+
+            <div class="controls-group">
+                <!-- Botão de Tela Cheia -->
+                <button id="fullscreen-btn" class="control-btn" title="Tela Cheia">
+                    <span class="btn-icon">
+                        <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+                        </svg>
+                    </span>
+                </button>
+
+                <!-- Botão de Sair -->
+                <button id="leave-btn" class="control-btn btn-danger" title="Sair da Sala">
+                    <span class="btn-icon">
+                        <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>
+                        </svg>
+                    </span>
+                    <span class="btn-label">Sair</span>
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <script src="app.js?v=3.0"></script>
+</body>
+</html>

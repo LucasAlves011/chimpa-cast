@@ -1,0 +1,39 @@
+# Compilação e Binários Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+out/
+build/
+
+# IDEs e Editores
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+.classpath
+.project
+.settings/
+.springBeans
+.sts4-cache
+
+# Arquivos de Configuração Local e Segredos (NUNCA SUBIR AO GIT)
+.env
+.env.local
+*.env
+application-local.properties
+application-local.yml
+
+# Arquivos de Runtime e Cache de Cota Local
+quota-storage.json
+docker-compose
+
+# Logs e Temporários
+*.log
+*.tmp
+*.bak
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db

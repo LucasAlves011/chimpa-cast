@@ -1,0 +1,10 @@
+.git
+.idea
+*.md
+.env
+.env.local
+target/classes
+target/test-classes
+target/generated-sources
+target/maven-status
+target/surefire-reports
