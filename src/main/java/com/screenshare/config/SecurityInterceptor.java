@@ -27,8 +27,8 @@ public class SecurityInterceptor implements HandlerInterceptor {
 
         String path = request.getRequestURI();
 
-        // Rotas públicas (estáticos e rota de validação de autenticação que tem seu próprio rate limiter)
-        if (path.startsWith("/api/auth/validate") || !path.startsWith("/api/")) {
+        // Rotas públicas ou com autenticação própria (estáticos, validação de login e settings com senha no body)
+        if (path.startsWith("/api/auth/validate") || path.startsWith("/api/settings/remote-kick") || !path.startsWith("/api/")) {
             return true;
         }
 

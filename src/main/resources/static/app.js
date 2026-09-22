@@ -19,7 +19,8 @@ const state = {
     // Mapa de inscrições ativas: userId -> { pc, sessionId, container }
     subscriptions: new Map(),
     unreadMessages: 0,
-    chatOpen: true
+    chatOpen: true,
+    allowRemoteScreenKick: true
 };
 
 // Elementos DOM
@@ -60,7 +61,11 @@ const dom = {
     closeWarningBannerBtn: document.getElementById('close-warning-banner'),
     cutoffModal: document.getElementById('cutoff-modal'),
     cutoffReasonText: document.getElementById('cutoff-reason-text'),
-    btnCutoffOk: document.getElementById('btn-cutoff-ok')
+    btnCutoffOk: document.getElementById('btn-cutoff-ok'),
+    inactivityModal: document.getElementById('inactivity-modal'),
+    inactivityCountdownNum: document.getElementById('inactivity-countdown-num'),
+    btnInactivityStay: document.getElementById('btn-inactivity-stay'),
+    btnInactivityStop: document.getElementById('btn-inactivity-stop')
 };
 
 // ==========================================
@@ -144,6 +149,38 @@ const soundManager = {
             });
         } catch (e) {
             console.debug("Erro no sintetizador de áudio:", e);
+        }
+    },
+    // Alerta sonoro de inatividade (Sino duplo suave de atenção)
+    playInactivityWarning() {
+        try {
+            this.init();
+            if (!this.ctx) return;
+            const now = this.ctx.currentTime;
+            const tones = [
+                { freq: 880, time: 0, duration: 0.25 },     // A5
+                { freq: 1174.66, time: 0.18, duration: 0.4 } // D6
+            ];
+
+            tones.forEach(t => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(t.freq, now + t.time);
+
+                gain.gain.setValueAtTime(0.0001, now + t.time);
+                gain.gain.linearRampToValueAtTime(0.22, now + t.time + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + t.time + t.duration);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now + t.time);
+                osc.stop(now + t.time + t.duration);
+            });
+        } catch (e) {
+            console.debug("Erro no som de inatividade:", e);
         }
     }
 };
@@ -245,6 +282,137 @@ if (togglePasswordBtn && dom.passwordInput) {
             eyeIcon.classList.toggle('hidden', isPassword);
             eyeOffIcon.classList.toggle('hidden', !isPassword);
         }
+    });
+}
+
+// ==========================================
+// 0.1 Gerenciamento de Inatividade (Anti-Dormir)
+// ==========================================
+
+const inactivityManager = {
+    // 45 minutos de inatividade para disparar aviso
+    INACTIVITY_TIMEOUT_MS: 45 * 60 * 1000,
+    // 60 segundos de tolerância na contagem regressiva
+    COUNTDOWN_SECONDS: 60,
+
+    inactivityTimer: null,
+    countdownTimer: null,
+    secondsLeft: 60,
+    isModalOpen: false,
+
+    initListeners() {
+        const resetActivity = () => {
+            if (!state.isSharing) return;
+            // Se o modal de aviso já estiver aberto, a atividade física não fecha sozinha: 
+            // exige clique explícito no botão para confirmar que está acordado.
+            if (!this.isModalOpen) {
+                this.restartInactivityTimer();
+            }
+        };
+
+        window.addEventListener('mousemove', resetActivity, { passive: true });
+        window.addEventListener('mousedown', resetActivity, { passive: true });
+        window.addEventListener('keydown', resetActivity, { passive: true });
+        window.addEventListener('touchstart', resetActivity, { passive: true });
+        window.addEventListener('scroll', resetActivity, { passive: true });
+    },
+
+    start() {
+        this.stop();
+        this.restartInactivityTimer();
+    },
+
+    stop() {
+        if (this.inactivityTimer) {
+            clearTimeout(this.inactivityTimer);
+            this.inactivityTimer = null;
+        }
+        if (this.countdownTimer) {
+            clearInterval(this.countdownTimer);
+            this.countdownTimer = null;
+        }
+        this.isModalOpen = false;
+        if (dom.inactivityModal) {
+            dom.inactivityModal.classList.add('hidden');
+        }
+    },
+
+    restartInactivityTimer() {
+        if (this.inactivityTimer) {
+            clearTimeout(this.inactivityTimer);
+        }
+        this.inactivityTimer = setTimeout(() => {
+            if (state.isSharing) {
+                this.triggerWarning();
+            }
+        }, this.INACTIVITY_TIMEOUT_MS);
+    },
+
+    triggerWarning() {
+        this.isModalOpen = true;
+        this.secondsLeft = this.COUNTDOWN_SECONDS;
+
+        if (dom.inactivityCountdownNum) {
+            dom.inactivityCountdownNum.textContent = this.secondsLeft;
+        }
+        if (dom.inactivityModal) {
+            dom.inactivityModal.classList.remove('hidden');
+        }
+
+        // Toca alerta sonoro agradável para chamar atenção de quem estiver distante
+        soundManager.playInactivityWarning();
+
+        if (this.countdownTimer) {
+            clearInterval(this.countdownTimer);
+        }
+
+        this.countdownTimer = setInterval(() => {
+            this.secondsLeft--;
+            if (dom.inactivityCountdownNum) {
+                dom.inactivityCountdownNum.textContent = this.secondsLeft;
+            }
+
+            // A cada 20 segundos toca um lembrete se ainda não respondeu
+            if (this.secondsLeft % 20 === 0 && this.secondsLeft > 0) {
+                soundManager.playInactivityWarning();
+            }
+
+            if (this.secondsLeft <= 0) {
+                clearInterval(this.countdownTimer);
+                this.countdownTimer = null;
+                this.executeAutoShutdown();
+            }
+        }, 1000);
+    },
+
+    stayActive() {
+        this.stop();
+        if (state.isSharing) {
+            this.start();
+        }
+    },
+
+    executeAutoShutdown() {
+        this.stop();
+        if (state.isSharing) {
+            appendSystemMessage("⚠️ Transmissão encerrada automaticamente por ausência de resposta ao alerta de inatividade.");
+            stopScreenShare();
+        }
+    }
+};
+
+// Inicializa captura de eventos do teclado/mouse
+inactivityManager.initListeners();
+
+if (dom.btnInactivityStay) {
+    dom.btnInactivityStay.addEventListener('click', () => {
+        inactivityManager.stayActive();
+    });
+}
+
+if (dom.btnInactivityStop) {
+    dom.btnInactivityStop.addEventListener('click', () => {
+        inactivityManager.executeAutoShutdown();
     });
 }
 
@@ -468,6 +636,9 @@ function sendWs(payload) {
 async function handleWsMessage(msg) {
     switch (msg.type) {
         case 'ROOM_STATE':
+            if (msg.allowRemoteScreenKick !== undefined) {
+                state.allowRemoteScreenKick = Boolean(msg.allowRemoteScreenKick);
+            }
             updateParticipants(msg.participants);
             if (msg.screens && Array.isArray(msg.screens)) {
                 for (const screen of msg.screens) {
@@ -484,6 +655,28 @@ async function handleWsMessage(msg) {
                 updateQualityIndicator(null, false);
             }
             updateGridLayout();
+            break;
+
+        case 'SETTINGS_UPDATED':
+            if (msg.allowRemoteScreenKick !== undefined) {
+                state.allowRemoteScreenKick = Boolean(msg.allowRemoteScreenKick);
+                // Atualiza visibilidade dos botões de kick em telas ativas
+                document.querySelectorAll('.kick-screen-btn').forEach(btn => {
+                    btn.style.display = state.allowRemoteScreenKick ? 'flex' : 'none';
+                });
+            }
+            break;
+
+        case 'FORCE_STOP_SCREEN':
+            if (state.isSharing) {
+                stopScreenShare();
+                inactivityManager.stop();
+                alert(`⚠️ Sua transmissão foi encerrada: ${msg.reason || 'Ação solicitada por outro usuário.'}`);
+            }
+            break;
+
+        case 'KICK_SCREEN_REJECTED':
+            alert(`Aviso: ${msg.reason || 'Operação não permitida.'}`);
             break;
 
         case 'USER_JOINED':
@@ -699,6 +892,9 @@ async function startScreenShare() {
             tracks: tracksToRegister
         });
 
+        // Inicia o monitoramento de inatividade (anti-esquecer / anti-dormir na live)
+        inactivityManager.start();
+
         updateGridLayout();
 
     } catch (err) {
@@ -711,6 +907,9 @@ async function startScreenShare() {
 }
 
 function stopScreenShare() {
+    // Para o monitoramento de inatividade e fecha modal se aberto
+    inactivityManager.stop();
+
     if (state.localStream) {
         state.localStream.getTracks().forEach(t => t.stop());
         state.localStream = null;
@@ -859,6 +1058,15 @@ function renderScreenCard(userId, username, stream, isMuted = false) {
                             <input type="range" class="volume-slider" min="0" max="1" step="0.02" value="1">
                             <span class="volume-percent">100%</span>
                         </div>
+                        ${state.allowRemoteScreenKick ? `
+                            <button class="screen-btn kick-screen-btn" title="Encerrar transmissão deste usuário (kick)">
+                                <svg class="svg-icon svg-icon-sm" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="15" y1="9" x2="9" y2="15"/>
+                                    <line x1="9" y1="9" x2="15" y2="15"/>
+                                </svg>
+                            </button>
+                        ` : ''}
                     ` : `
                         <div class="screen-tag" style="font-size: 11px; opacity: 0.8;">(Você)</div>
                     `}
@@ -874,6 +1082,18 @@ function renderScreenCard(userId, username, stream, isMuted = false) {
         dom.screensGrid.appendChild(card);
 
         // Ações dos botões do card
+        const kickBtn = card.querySelector('.kick-screen-btn');
+        if (kickBtn) {
+            kickBtn.addEventListener('click', () => {
+                const confirmed = confirm(`Deseja realmente encerrar a transmissão de ${username}?`);
+                if (confirmed) {
+                    sendWs({
+                        type: 'KICK_SCREEN',
+                        targetUserId: userId
+                    });
+                }
+            });
+        }
         const video = card.querySelector('video');
         video.srcObject = stream;
 

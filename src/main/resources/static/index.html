@@ -6,7 +6,7 @@
     <title>ChimpaCast</title>
     <link rel="icon" type="image/x-icon" href="images/81_85271.ico">
     <link rel="shortcut icon" type="image/x-icon" href="images/81_85271.ico">
-    <link rel="stylesheet" href="style.css?v=11.0">
+    <link rel="stylesheet" href="style.css?v=12.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -172,6 +172,37 @@
                 <span class="badge-sub">Kill-Switch de proteção ativado.</span>
             </div>
             <button id="btn-cutoff-ok" class="btn btn-danger btn-block" style="margin-top: 20px;">Entendido</button>
+        </div>
+    </div>
+
+    <!-- Modal de Inatividade: Você ainda está aí? -->
+    <div id="inactivity-modal" class="modal-overlay hidden" style="z-index: 9998;">
+        <div class="modal-card modal-inactivity">
+            <div class="modal-header">
+                <div class="inactivity-icon-wrapper">
+                    <span class="inactivity-pulse"></span>
+                    <svg class="svg-icon svg-icon-lg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                </div>
+                <h2 style="color: #facc15; margin-bottom: 6px;">Você ainda está aí? 🍌</h2>
+                <p style="color: #94a3b8; font-size: 13.5px; line-height: 1.5;">
+                    Detectamos que você está sem interagir há algum tempo. Para economizar a franquia da sala e evitar transmissões esquecidas, o compartilhamento será encerrado em:
+                </p>
+            </div>
+            
+            <div class="inactivity-countdown-box">
+                <span id="inactivity-countdown-num" class="inactivity-countdown-num">60</span>
+                <span class="inactivity-countdown-label">segundos restantes</span>
+            </div>
+
+            <button id="btn-inactivity-stay" class="btn btn-primary btn-block" style="margin-top: 16px;">
+                Continuar Transmitindo
+            </button>
+            <button id="btn-inactivity-stop" class="btn btn-secondary btn-block" style="margin-top: 8px; opacity: 0.85;">
+                Encerrar Transmissão Agora
+            </button>
         </div>
     </div>
 
@@ -346,6 +377,6 @@
         </footer>
     </div>
 
-    <script src="app.js?v=11.0"></script>
+    <script src="app.js?v=12.0"></script>
 </body>
 </html>

@@ -22,6 +22,7 @@ public class RoomWebSocketHandler extends TextWebSocketHandler {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final com.screenshare.service.AuthService authService;
+    private final com.screenshare.service.RoomSettingsService roomSettingsService;
 
     // Sessão WebSocket -> Metadados do Usuário
     private final Map<String, UserSession> sessions = new ConcurrentHashMap<>();
@@ -35,8 +36,10 @@ public class RoomWebSocketHandler extends TextWebSocketHandler {
     // Sessão WebSocket -> Timestamp da última mensagem enviada no chat (anti-flood)
     private final Map<String, Long> lastChatTimestamps = new ConcurrentHashMap<>();
 
-    public RoomWebSocketHandler(com.screenshare.service.AuthService authService) {
+    public RoomWebSocketHandler(com.screenshare.service.AuthService authService,
+                                com.screenshare.service.RoomSettingsService roomSettingsService) {
         this.authService = authService;
+        this.roomSettingsService = roomSettingsService;
     }
 
     public record UserSession(String userId, String username, String roomId, WebSocketSession session) {}
@@ -144,11 +147,36 @@ public class RoomWebSocketHandler extends TextWebSocketHandler {
                 case "JOIN_ROOM" -> handleJoinRoom(session, json);
                 case "SCREEN_STARTED" -> handleScreenStarted(session, json);
                 case "SCREEN_STOPPED" -> handleScreenStopped(session);
+                case "KICK_SCREEN" -> handleKickScreen(session, json);
                 case "CHAT_MESSAGE" -> handleChatMessage(session, json);
                 default -> log.warn("Tipo de mensagem desconhecido: {}", type);
             }
         } catch (Exception e) {
             log.error("Erro ao processar mensagem WebSocket: {}", e.getMessage(), e);
+        }
+    }
+
+    public void broadcastSettingsUpdate() {
+        try {
+            Map<String, Object> msg = Map.of(
+                    "type", "SETTINGS_UPDATED",
+                    "allowRemoteScreenKick", roomSettingsService.isAllowRemoteScreenKick()
+            );
+            String payload = objectMapper.writeValueAsString(msg);
+            TextMessage textMessage = new TextMessage(payload);
+            for (Set<WebSocketSession> roomSet : rooms.values()) {
+                for (WebSocketSession s : roomSet) {
+                    if (s.isOpen()) {
+                        synchronized (s) {
+                            try {
+                                s.sendMessage(textMessage);
+                            } catch (Exception ignored) {}
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Erro ao transmitir atualização de configurações: {}", e.getMessage());
         }
     }
 
@@ -197,6 +225,7 @@ public class RoomWebSocketHandler extends TextWebSocketHandler {
         }
         roomState.put("participants", participants);
         roomState.put("screens", roomScreens.get(roomId).values());
+        roomState.put("allowRemoteScreenKick", roomSettingsService.isAllowRemoteScreenKick());
 
         sendJson(session, roomState);
 
@@ -256,6 +285,69 @@ public class RoomWebSocketHandler extends TextWebSocketHandler {
                     "userId", user.userId()
             );
             broadcastToRoom(user.roomId(), notification, null);
+        }
+    }
+
+    private void handleKickScreen(WebSocketSession session, JsonNode json) throws IOException {
+        UserSession requester = sessions.get(session.getId());
+        if (requester == null) return;
+
+        if (!roomSettingsService.isAllowRemoteScreenKick()) {
+            log.warn("Tentativa de kick de tela por [{}] bloqueada: funcionalidade desativada.", requester.username());
+            sendJson(session, Map.of(
+                    "type", "KICK_SCREEN_REJECTED",
+                    "reason", "O encerramento remoto de telas está desativado pelo administrador."
+            ));
+            return;
+        }
+
+        String targetUserId = json.path("targetUserId").asText("").trim();
+        if (targetUserId.isEmpty()) return;
+
+        // Procura a sessão do usuário alvo na mesma sala
+        Set<WebSocketSession> roomSet = rooms.get(requester.roomId());
+        if (roomSet == null) return;
+
+        UserSession targetSession = null;
+        for (WebSocketSession s : roomSet) {
+            UserSession us = sessions.get(s.getId());
+            if (us != null && us.userId().equals(targetUserId)) {
+                targetSession = us;
+                break;
+            }
+        }
+
+        if (targetSession != null) {
+            log.info("Usuário [{}] encerrou remotamente a tela de [{}] na sala [{}]",
+                    requester.username(), targetSession.username(), requester.roomId());
+
+            // 1. Envia ordem compulsória de parada para o transmissor alvo
+            sendJson(targetSession.session(), Map.of(
+                    "type", "FORCE_STOP_SCREEN",
+                    "kickedBy", requester.username(),
+                    "reason", "Sua transmissão foi encerrada por " + requester.username() + "."
+            ));
+
+            // 2. Remove do mapa de telas se ainda estiver
+            Map<String, ScreenInfo> screens = roomScreens.get(requester.roomId());
+            if (screens != null) {
+                screens.remove(targetUserId);
+            }
+
+            // 3. Notifica a sala inteira
+            broadcastToRoom(requester.roomId(), Map.of(
+                    "type", "SCREEN_STOPPED",
+                    "userId", targetUserId
+            ), null);
+
+            // 4. Mensagem de sistema no chat
+            broadcastToRoom(requester.roomId(), Map.of(
+                    "type", "CHAT_MESSAGE",
+                    "userId", "system",
+                    "username", "Sistema",
+                    "text", "🛑 A transmissão de " + targetSession.username() + " foi encerrada por " + requester.username() + ".",
+                    "timestamp", System.currentTimeMillis()
+            ), null);
         }
     }
 

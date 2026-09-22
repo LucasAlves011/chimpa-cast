@@ -55,4 +55,32 @@ class SecurityEndpointsTest {
                         .content("{\"tracks\":[]}"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @DisplayName("Alteração de remote-kick sem credencial válida deve retornar HTTP 401")
+    void testSettingsRemoteKickUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/settings/remote-kick")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("Alteração de remote-kick com senha válida deve retornar HTTP 200 e alterar status")
+    void testSettingsRemoteKickAuthorized() throws Exception {
+        mockMvc.perform(post("/api/settings/remote-kick")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":false,\"password\":\"amigos123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.allowRemoteScreenKick").value(false));
+
+        // Reverte para true
+        mockMvc.perform(post("/api/settings/remote-kick")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true,\"password\":\"amigos123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.allowRemoteScreenKick").value(true));
+    }
 }

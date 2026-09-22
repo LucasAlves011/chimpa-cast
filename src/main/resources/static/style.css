@@ -1445,3 +1445,96 @@ svg {
     max-height: 20px;
     flex-shrink: 0;
 }
+
+/* =========================================================
+   Modal de Detecção de Inatividade (Anti-Dormir / Anti-Esquecer)
+   ========================================================= */
+.modal-inactivity {
+    max-width: 440px;
+    border: 1px solid rgba(250, 204, 21, 0.4);
+    box-shadow: 0 0 50px rgba(250, 204, 21, 0.2), 0 25px 50px rgba(0, 0, 0, 0.8);
+    background: #181b22;
+    text-align: center;
+    padding: 30px 28px 24px 28px;
+}
+
+.inactivity-icon-wrapper {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(250, 204, 21, 0.12);
+    border: 1px solid rgba(250, 204, 21, 0.35);
+    border-radius: 50%;
+    color: #facc15;
+}
+
+.inactivity-pulse {
+    position: absolute;
+    top: -4px; left: -4px; right: -4px; bottom: -4px;
+    border-radius: 50%;
+    border: 2px solid rgba(250, 204, 21, 0.4);
+    animation: inactivityPulseAnim 1.8s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+}
+
+@keyframes inactivityPulseAnim {
+    0% {
+        transform: scale(0.95);
+        opacity: 0.8;
+    }
+    70% {
+        transform: scale(1.35);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1.35);
+        opacity: 0;
+    }
+}
+
+.inactivity-countdown-box {
+    background: #0f1115;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 18px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+}
+
+.inactivity-countdown-num {
+    font-size: 42px;
+    font-weight: 800;
+    color: #facc15;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 16px rgba(250, 204, 21, 0.4);
+}
+
+.inactivity-countdown-label {
+    font-size: 12px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 600;
+}
+
+/* Botão de Kick/Encerramento Remoto de Tela */
+.screen-btn.kick-screen-btn {
+    color: #f87171;
+    transition: all 0.2s ease;
+}
+
+.screen-btn.kick-screen-btn:hover {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: rgba(239, 68, 68, 0.6);
+    color: #fca5a5;
+    transform: scale(1.05);
+}
+
