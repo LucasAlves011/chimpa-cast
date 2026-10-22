@@ -6,7 +6,7 @@
     <title>ChimpaCast</title>
     <link rel="icon" type="image/x-icon" href="images/81_85271.ico">
     <link rel="shortcut icon" type="image/x-icon" href="images/81_85271.ico">
-    <link rel="stylesheet" href="style.css?v=12.0">
+    <link rel="stylesheet" href="style.css?v=14.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -33,8 +33,19 @@
                     <input type="text" id="username-input" placeholder="Ex: Lucas" required maxlength="20" autofocus>
                 </div>
                 <div class="form-group">
-                    <label for="room-input">Nome da Sala</label>
-                    <input type="text" id="room-input" placeholder="Ex: jogatina" value="principal" required maxlength="25" disabled="true">
+                    <label for="room-input">Sala</label>
+                    <div class="room-select-wrapper">
+                        <select id="room-input" class="login-room-select" required>
+                            <option value="principal" data-label="principal" selected>principal (0 online)</option>
+                            <option value="sala-2" data-label="sala-2">sala-2 (0 online)</option>
+                            <option value="sala-3" data-label="sala-3">sala-3 (0 online)</option>
+                        </select>
+                        <span class="select-arrow" aria-hidden="true">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="password-input">Senha de Acesso</label>
@@ -206,6 +217,33 @@
         </div>
     </div>
 
+    <!-- Modal de Usuários na Sala -->
+    <div id="participants-modal" class="modal-overlay hidden">
+        <div class="modal-card modal-participants">
+            <div class="modal-header">
+                <div class="modal-header-row">
+                    <div class="modal-title-group">
+                        <span class="title-icon">
+                            <svg class="svg-icon svg-icon-lg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                            </svg>
+                        </span>
+                        <h2>Usuários na Sala</h2>
+                    </div>
+                    <button id="close-participants-modal" class="icon-close-btn" title="Fechar">&times;</button>
+                </div>
+                <p id="modal-participants-subtitle">Sala #principal • 1 online</p>
+            </div>
+
+            <div id="participants-list" class="participants-list">
+                <!-- Preenchido dinamicamente pelo JS -->
+            </div>
+        </div>
+    </div>
+
     <!-- Aplicação Principal -->
     <div id="app" class="app-container hidden">
         <!-- Barra Superior -->
@@ -243,6 +281,14 @@
             </div>
 
             <div class="header-right">
+                <button id="open-participants-btn" class="icon-btn" title="Ver Usuários na Sala">
+                    <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                </button>
                 <button id="toggle-chat-btn" class="icon-btn" title="Alternar Chat">
                     <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>
@@ -307,7 +353,7 @@
             <aside id="chat-sidebar" class="chat-sidebar">
                 <div class="chat-header">
                     <h4>Chat da Sala</h4>
-                    <span id="participant-count" class="badge">1 online</span>
+                    <span id="participant-count" class="badge badge-clickable" title="Clique para ver os usuários na sala">1 online</span>
                 </div>
                 <div id="chat-messages" class="chat-messages">
                     <div class="chat-system-msg">Bem-vindo à sala! Compartilhe o link com seus amigos.</div>
@@ -377,6 +423,6 @@
         </footer>
     </div>
 
-    <script src="app.js?v=12.0"></script>
+    <script src="app.js?v=14.0"></script>
 </body>
 </html>

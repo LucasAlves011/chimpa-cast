@@ -25,6 +25,13 @@ public class SettingsController {
         this.roomWebSocketHandler = roomWebSocketHandler;
     }
 
+    @GetMapping("/rooms-summary")
+    public ResponseEntity<Map<String, Object>> getRoomsSummary() {
+        return ResponseEntity.ok(Map.of(
+                "rooms", roomWebSocketHandler.getRoomsCounts()
+        ));
+    }
+
     @GetMapping("/remote-kick")
     public ResponseEntity<Map<String, Object>> getRemoteKickStatus() {
         return ResponseEntity.ok(Map.of(

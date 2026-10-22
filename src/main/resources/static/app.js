@@ -3,8 +3,17 @@
  * Plataforma de compartilhamento de tela de alta performance para primatas
  */
 
+function getOrCreateUserId() {
+    let uid = sessionStorage.getItem('chimpacast_uid');
+    if (!uid) {
+        uid = 'user-' + Math.random().toString(36).substring(2, 9);
+        sessionStorage.setItem('chimpacast_uid', uid);
+    }
+    return uid;
+}
+
 const state = {
-    userId: 'user-' + Math.random().toString(36).substring(2, 9),
+    userId: getOrCreateUserId(),
     username: '',
     room: 'principal',
     password: '',
@@ -12,12 +21,16 @@ const state = {
     quotaAvailable: true,
     authFailed: false,
     ws: null,
+    wsPingInterval: null,
     isSharing: false,
     localStream: null,
     publisherPc: null,
     publisherSessionId: null,
-    // Mapa de inscrições ativas: userId -> { pc, sessionId, container }
+    publishedTracks: null,
+    publishedQuality: null,
+    // Mapa de inscrições ativas: userId -> { pc, sessionId, publisherSessionId, username, cancelled }
     subscriptions: new Map(),
+    participants: [],
     unreadMessages: 0,
     chatOpen: true,
     allowRemoteScreenKick: true
@@ -47,6 +60,11 @@ const dom = {
     leaveBtn: document.getElementById('leave-btn'),
     chatSidebar: document.getElementById('chat-sidebar'),
     toggleChatBtn: document.getElementById('toggle-chat-btn'),
+    openParticipantsBtn: document.getElementById('open-participants-btn'),
+    participantsModal: document.getElementById('participants-modal'),
+    closeParticipantsModalBtn: document.getElementById('close-participants-modal'),
+    participantsList: document.getElementById('participants-list'),
+    modalParticipantsSubtitle: document.getElementById('modal-participants-subtitle'),
     chatMessages: document.getElementById('chat-messages'),
     chatForm: document.getElementById('chat-form'),
     chatInput: document.getElementById('chat-input'),
@@ -290,8 +308,8 @@ if (togglePasswordBtn && dom.passwordInput) {
 // ==========================================
 
 const inactivityManager = {
-    // 45 minutos de inatividade para disparar aviso
-    INACTIVITY_TIMEOUT_MS: 45 * 60 * 1000,
+    // 2 horas (120 minutos) de inatividade para disparar aviso
+    INACTIVITY_TIMEOUT_MS: 2 * 60 * 60 * 1000,
     // 60 segundos de tolerância na contagem regressiva
     COUNTDOWN_SECONDS: 60,
 
@@ -530,6 +548,10 @@ function handleSessionExpired(msg) {
     sessionStorage.removeItem('chimpacast_token');
     sessionStorage.removeItem('streamflow_token');
     sessionStorage.removeItem('streamflow_pwd');
+    if (state.wsPingInterval) {
+        clearInterval(state.wsPingInterval);
+        state.wsPingInterval = null;
+    }
     if (state.ws) {
         try { state.ws.close(); } catch(e) {}
     }
@@ -543,6 +565,11 @@ function connectWebSocket() {
         console.warn("Nenhuma credencial disponível para WebSocket. Redirecionando para login.");
         handleSessionExpired("Por favor, faça login para entrar na sala.");
         return;
+    }
+
+    if (state.wsPingInterval) {
+        clearInterval(state.wsPingInterval);
+        state.wsPingInterval = null;
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -567,6 +594,25 @@ function connectWebSocket() {
             token: state.sessionToken,
             password: state.password
         });
+
+        // Se estava transmitindo tela durante uma micro-queda do WebSocket, re-anuncia a tela ativa
+        if (state.isSharing && state.publisherSessionId && state.publishedTracks) {
+            setTimeout(() => {
+                if (state.isSharing && state.publisherSessionId && state.publishedTracks) {
+                    sendWs({
+                        type: 'SCREEN_STARTED',
+                        sessionId: state.publisherSessionId,
+                        quality: state.publishedQuality || '1080p @ 60 FPS',
+                        tracks: state.publishedTracks
+                    });
+                }
+            }, 250);
+        }
+
+        // Heartbeat a cada 25s para evitar timeout de conexão no Cloudflare/Proxy
+        state.wsPingInterval = setInterval(() => {
+            sendWs({ type: 'PING' });
+        }, 25000);
     };
 
     state.ws.onmessage = async (event) => {
@@ -579,7 +625,17 @@ function connectWebSocket() {
     };
 
     state.ws.onclose = async (event) => {
+        if (state.wsPingInterval) {
+            clearInterval(state.wsPingInterval);
+            state.wsPingInterval = null;
+        }
         dom.statusText.textContent = "Desconectado";
+
+        // Se a sessão foi substituída por outra aba/conexão do mesmo usuário
+        if (event.code === 4002) {
+            console.warn("Sessão substituída por uma nova conexão.");
+            return;
+        }
         
         // Se a conexão foi rejeitada por falha explícita de autenticação
         if (event.code === 4001 || event.code === 1003 || event.code === 1008 || state.authFailed) {
@@ -635,12 +691,38 @@ function sendWs(payload) {
 
 async function handleWsMessage(msg) {
     switch (msg.type) {
+        case 'PONG':
+            break;
+
         case 'ROOM_STATE':
             if (msg.allowRemoteScreenKick !== undefined) {
                 state.allowRemoteScreenKick = Boolean(msg.allowRemoteScreenKick);
             }
             updateParticipants(msg.participants);
             if (msg.screens && Array.isArray(msg.screens)) {
+                const activeMap = new Map();
+                for (const s of msg.screens) {
+                    if (s.userId !== state.userId) {
+                        activeMap.set(s.userId, s);
+                    }
+                }
+
+                // Remove inscrições locais que não existem mais no servidor ou mudaram de sessionId
+                for (const [subUid, sub] of Array.from(state.subscriptions.entries())) {
+                    const serverScreen = activeMap.get(subUid);
+                    if (!serverScreen || serverScreen.sessionId !== sub.publisherSessionId) {
+                        removeScreen(subUid);
+                    }
+                }
+
+                // Remove cards órfãos no DOM que não correspondam a telas ativas
+                dom.screensGrid.querySelectorAll('.screen-card').forEach(card => {
+                    const cardUid = card.dataset.userId || card.id.replace(/^card-/, '');
+                    if (cardUid !== state.userId && !activeMap.has(cardUid)) {
+                        removeScreen(cardUid);
+                    }
+                });
+
                 for (const screen of msg.screens) {
                     if (screen.userId !== state.userId) {
                         await subscribeToScreen(screen);
@@ -651,8 +733,14 @@ async function handleWsMessage(msg) {
                 } else if (!state.isSharing) {
                     updateQualityIndicator(null, false);
                 }
-            } else if (!state.isSharing) {
-                updateQualityIndicator(null, false);
+            } else {
+                // Nenhuma tela ativa no servidor: limpa quaisquer telas remotas residuais
+                for (const [subUid] of Array.from(state.subscriptions.entries())) {
+                    removeScreen(subUid);
+                }
+                if (!state.isSharing) {
+                    updateQualityIndicator(null, false);
+                }
             }
             updateGridLayout();
             break;
@@ -681,11 +769,24 @@ async function handleWsMessage(msg) {
 
         case 'USER_JOINED':
             appendSystemMessage(`${msg.username} entrou na sala.`);
+            if (Array.isArray(msg.participants)) {
+                updateParticipants(msg.participants);
+            } else if (msg.userId && msg.username) {
+                const exists = state.participants.some(p => p.userId === msg.userId);
+                if (!exists) {
+                    updateParticipants([...state.participants, { userId: msg.userId, username: msg.username }]);
+                }
+            }
             break;
 
         case 'USER_LEFT':
             appendSystemMessage(`${msg.username} saiu da sala.`);
-            removeScreen(msg.userId);
+            removeScreen(msg.userId, msg.username);
+            if (Array.isArray(msg.participants)) {
+                updateParticipants(msg.participants);
+            } else if (msg.userId) {
+                updateParticipants(state.participants.filter(p => p.userId !== msg.userId));
+            }
             if (state.subscriptions.size === 0 && !state.isSharing) {
                 updateQualityIndicator(null, false);
             }
@@ -698,16 +799,18 @@ async function handleWsMessage(msg) {
                 appendSystemMessage(`${msg.username} começou a transmitir a tela (${msg.quality || '1080p @ 60 FPS'}).`);
                 await subscribeToScreen(msg);
             }
+            renderParticipantsModal();
             updateGridLayout();
             break;
 
         case 'SCREEN_STOPPED':
             soundManager.playScreenShareStop();
             appendSystemMessage(`Transmissão de tela finalizada.`);
-            removeScreen(msg.userId);
+            removeScreen(msg.userId, msg.username);
             if (state.subscriptions.size === 0 && !state.isSharing) {
                 updateQualityIndicator(null, false);
             }
+            renderParticipantsModal();
             updateGridLayout();
             break;
 
@@ -727,7 +830,7 @@ async function handleWsMessage(msg) {
         case 'EMERGENCY_QUOTA_CUTOFF':
             state.quotaAvailable = false;
             stopScreenShare();
-            for (const [uid] of state.subscriptions) {
+            for (const [uid] of Array.from(state.subscriptions.entries())) {
                 removeScreen(uid);
             }
             if (dom.cutoffReasonText && msg.reason) {
@@ -873,12 +976,15 @@ async function startScreenShare() {
             await state.publisherPc.setRemoteDescription(new RTCSessionDescription(tracksData.sessionDescription));
         }
 
-        state.isSharing = true;
-        dom.shareBtn.classList.add('active');
-        dom.shareBtnText.textContent = "Parar de Compartilhar";
-
         const currentQualityChoice = dom.qualitySelect ? dom.qualitySelect.value : '1080p60';
         const currentQualityLabel = getQualityFriendlyName(currentQualityChoice);
+
+        state.isSharing = true;
+        state.publishedTracks = tracksToRegister;
+        state.publishedQuality = currentQualityLabel;
+
+        dom.shareBtn.classList.add('active');
+        dom.shareBtnText.textContent = "Parar de Compartilhar";
         updateQualityIndicator(currentQualityLabel, true);
 
         // Cria o card de visualização local da própria tela (mutado)
@@ -916,11 +1022,15 @@ function stopScreenShare() {
     }
 
     if (state.publisherPc) {
-        state.publisherPc.close();
+        try { state.publisherPc.close(); } catch (e) {}
         state.publisherPc = null;
     }
 
     state.isSharing = false;
+    state.publisherSessionId = null;
+    state.publishedTracks = null;
+    state.publishedQuality = null;
+
     dom.shareBtn.classList.remove('active');
     dom.shareBtnText.textContent = "Compartilhar Tela";
 
@@ -948,7 +1058,50 @@ if (dom.qualitySelect) {
 
 async function subscribeToScreen(screen) {
     const remoteUserId = screen.userId;
-    if (state.subscriptions.has(remoteUserId)) return;
+    const remoteUsername = (screen.username || '').trim();
+
+    // 1. Verifica se já existe inscrição para este mesmo userId
+    const existingSub = state.subscriptions.get(remoteUserId);
+    if (existingSub) {
+        const isSameSession = existingSub.publisherSessionId === screen.sessionId;
+        const pcAlive = existingSub.pc && !['failed', 'closed'].includes(existingSub.pc.connectionState);
+        if (isSameSession && !existingSub.cancelled && (existingSub.connecting || pcAlive)) {
+            return;
+        }
+        // Se for uma nova sessão do mesmo userId ou se a anterior falhou, limpa antes de recriar
+        removeScreen(remoteUserId);
+    }
+
+    // 2. Garante que não existam lives fantasmas de outro userId antigo do mesmo username
+    if (remoteUsername) {
+        for (const [uid, sub] of Array.from(state.subscriptions.entries())) {
+            if (uid !== remoteUserId && sub.username && sub.username.toLowerCase() === remoteUsername.toLowerCase()) {
+                removeScreen(uid, sub.username);
+            }
+        }
+        dom.screensGrid.querySelectorAll('.screen-card').forEach(card => {
+            const cardUid = card.dataset.userId || card.id.replace(/^card-/, '');
+            const cardUname = (card.dataset.username || '').trim();
+            if (cardUid !== state.userId && cardUid !== remoteUserId &&
+                cardUname.toLowerCase() === remoteUsername.toLowerCase()) {
+                removeScreen(cardUid, cardUname);
+            }
+        });
+    }
+
+    // 3. Registra imediatamente a entrada (lock assíncrono) para evitar condições de corrida
+    const subEntry = {
+        pc: null,
+        sessionId: null,
+        publisherSessionId: screen.sessionId,
+        username: remoteUsername,
+        connecting: true,
+        cancelled: false,
+        disconnectTimer: null
+    };
+    state.subscriptions.set(remoteUserId, subEntry);
+
+    let subscriberPc = null;
 
     try {
         // 1. Cria uma sessão na Cloudflare Calls para o espectador
@@ -960,15 +1113,47 @@ async function subscribeToScreen(screen) {
         const sessionData = await sessionRes.json();
         const subscriberSessionId = sessionData.sessionId;
 
+        if (subEntry.cancelled || state.subscriptions.get(remoteUserId) !== subEntry) {
+            return;
+        }
+
         // 2. Cria PeerConnection para receber a mídia
-        const subscriberPc = new RTCPeerConnection({
+        subscriberPc = new RTCPeerConnection({
             iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }]
         });
+        subEntry.pc = subscriberPc;
+        subEntry.sessionId = subscriberSessionId;
 
         const remoteStream = new MediaStream();
 
         subscriberPc.ontrack = (event) => {
             remoteStream.addTrack(event.track);
+        };
+
+        // Monitora quedas definitivas da conexão WebRTC do transmissor
+        subscriberPc.onconnectionstatechange = () => {
+            if (subEntry.cancelled || state.subscriptions.get(remoteUserId) !== subEntry) return;
+            const st = subscriberPc.connectionState;
+            if (st === 'connected') {
+                if (subEntry.disconnectTimer) {
+                    clearTimeout(subEntry.disconnectTimer);
+                    subEntry.disconnectTimer = null;
+                }
+            } else if (st === 'failed' || st === 'closed') {
+                console.warn(`Conexão WebRTC de ${remoteUsername} (${remoteUserId}) encerrada (${st}). Removendo card.`);
+                removeScreen(remoteUserId, remoteUsername);
+            } else if (st === 'disconnected') {
+                if (!subEntry.disconnectTimer) {
+                    subEntry.disconnectTimer = setTimeout(() => {
+                        if (!subEntry.cancelled &&
+                            state.subscriptions.get(remoteUserId) === subEntry &&
+                            ['disconnected', 'failed', 'closed'].includes(subscriberPc.connectionState)) {
+                            console.warn(`Conexão WebRTC de ${remoteUsername} permaneceu desconectada. Removendo card travado.`);
+                            removeScreen(remoteUserId, remoteUsername);
+                        }
+                    }, 10000);
+                }
+            }
         };
 
         // 3. Monta lista de tracks a assinar
@@ -992,6 +1177,11 @@ async function subscribeToScreen(screen) {
 
         const subTracksData = await subTracksRes.json();
 
+        if (subEntry.cancelled || state.subscriptions.get(remoteUserId) !== subEntry) {
+            try { subscriberPc.close(); } catch (e) {}
+            return;
+        }
+
         // 5. Cloudflare devolve uma Oferta SDP; aplicamos e geramos uma Resposta (Answer)
         if (subTracksData.sessionDescription) {
             await subscriberPc.setRemoteDescription(new RTCSessionDescription(subTracksData.sessionDescription));
@@ -1000,6 +1190,11 @@ async function subscribeToScreen(screen) {
 
             // Aguarda candidatos ICE
             await waitForIceGathering(subscriberPc);
+
+            if (subEntry.cancelled || state.subscriptions.get(remoteUserId) !== subEntry) {
+                try { subscriberPc.close(); } catch (e) {}
+                return;
+            }
 
             // 6. Envia a resposta de volta para a Cloudflare para fechar o handshake
             await fetchWithAuth(`/api/calls/sessions/${subscriberSessionId}/renegotiate`, {
@@ -1014,18 +1209,26 @@ async function subscribeToScreen(screen) {
             });
         }
 
+        if (subEntry.cancelled || state.subscriptions.get(remoteUserId) !== subEntry) {
+            try { subscriberPc.close(); } catch (e) {}
+            return;
+        }
+
+        subEntry.connecting = false;
+
         // Renderiza o card do vídeo remoto na grade
         renderScreenCard(remoteUserId, screen.username, remoteStream, false);
-
-        state.subscriptions.set(remoteUserId, {
-            pc: subscriberPc,
-            sessionId: subscriberSessionId
-        });
-
         updateGridLayout();
 
     } catch (err) {
         console.error(`Erro ao assinar tela de ${screen.username}:`, err);
+        if (subscriberPc) {
+            try { subscriberPc.close(); } catch (e) {}
+        }
+        if (state.subscriptions.get(remoteUserId) === subEntry) {
+            state.subscriptions.delete(remoteUserId);
+        }
+        updateGridLayout();
     }
 }
 
@@ -1034,11 +1237,30 @@ async function subscribeToScreen(screen) {
 // ==========================================
 
 function renderScreenCard(userId, username, stream, isMuted = false) {
+    // Antes de renderizar um card remoto, remove qualquer card antigo que tenha o mesmo username mas outro userId
+    if (!isMuted && username) {
+        const cleanUname = username.trim().toLowerCase();
+        dom.screensGrid.querySelectorAll('.screen-card').forEach(existingCard => {
+            const existingUid = existingCard.dataset.userId || existingCard.id.replace(/^card-/, '');
+            const existingUname = (existingCard.dataset.username || '').trim().toLowerCase();
+            if (existingUid !== state.userId && existingUid !== userId && existingUname === cleanUname) {
+                const oldVid = existingCard.querySelector('video');
+                if (oldVid) {
+                    oldVid.pause();
+                    oldVid.srcObject = null;
+                }
+                existingCard.remove();
+            }
+        });
+    }
+
     let card = document.getElementById(`card-${userId}`);
     if (!card) {
         card = document.createElement('div');
         card.id = `card-${userId}`;
         card.className = 'screen-card';
+        card.dataset.userId = userId;
+        card.dataset.username = username || '';
 
         card.innerHTML = `
             <video autoplay playsinline ${isMuted ? 'muted' : ''}></video>
@@ -1049,7 +1271,7 @@ function renderScreenCard(userId, username, stream, isMuted = false) {
                         <line x1="8" x2="16" y1="21" y2="21"/>
                         <line x1="12" x2="12" y1="17" y2="21"/>
                     </svg>
-                    <span class="stream-username">${username}</span>
+                    <span class="stream-username">${escapeHtml(username)}</span>
                 </div>
                 <div class="screen-controls">
                     ${!isMuted ? `
@@ -1149,6 +1371,8 @@ function renderScreenCard(userId, username, stream, isMuted = false) {
             });
         }
     } else {
+        card.dataset.userId = userId;
+        card.dataset.username = username || '';
         const video = card.querySelector('video');
         video.srcObject = stream;
         const updateAspectRatio = () => {
@@ -1164,16 +1388,67 @@ function renderScreenCard(userId, username, stream, isMuted = false) {
     }
 }
 
-function removeScreen(userId) {
-    const card = document.getElementById(`card-${userId}`);
-    if (card) {
-        card.remove();
+function destroyCardElement(card) {
+    if (!card) return;
+    if (document.fullscreenElement === card) {
+        document.exitFullscreen().catch(() => {});
+    }
+    const video = card.querySelector('video');
+    if (video) {
+        try {
+            video.pause();
+            video.srcObject = null;
+        } catch (e) {}
+    }
+    card.remove();
+}
+
+function closeSubscriptionEntry(sub) {
+    if (!sub) return;
+    sub.cancelled = true;
+    if (sub.disconnectTimer) {
+        clearTimeout(sub.disconnectTimer);
+        sub.disconnectTimer = null;
+    }
+    if (sub.pc) {
+        try {
+            sub.pc.onconnectionstatechange = null;
+            sub.pc.ontrack = null;
+            sub.pc.close();
+        } catch (e) {}
+        sub.pc = null;
+    }
+}
+
+function removeScreen(userId, username = null) {
+    if (userId) {
+        const card = document.getElementById(`card-${userId}`);
+        destroyCardElement(card);
+
+        const sub = state.subscriptions.get(userId);
+        if (sub) {
+            closeSubscriptionEntry(sub);
+            state.subscriptions.delete(userId);
+        }
     }
 
-    const sub = state.subscriptions.get(userId);
-    if (sub) {
-        if (sub.pc) sub.pc.close();
-        state.subscriptions.delete(userId);
+    // Se username foi informado (e não é o próprio usuário local), limpa também quaisquer cards/inscrições órfãs daquele username
+    if (username && userId !== state.userId) {
+        const cleanUname = username.trim().toLowerCase();
+        for (const [uid, sub] of Array.from(state.subscriptions.entries())) {
+            if (sub.username && sub.username.trim().toLowerCase() === cleanUname) {
+                closeSubscriptionEntry(sub);
+                state.subscriptions.delete(uid);
+                destroyCardElement(document.getElementById(`card-${uid}`));
+            }
+        }
+        dom.screensGrid.querySelectorAll('.screen-card').forEach(c => {
+            const cUid = c.dataset.userId || c.id.replace(/^card-/, '');
+            const cUname = (c.dataset.username || '').trim().toLowerCase();
+            if (cUid !== state.userId && cUname === cleanUname) {
+                destroyCardElement(c);
+            }
+        });
     }
 
     updateGridLayout();
@@ -1264,9 +1539,114 @@ dom.leaveBtn.addEventListener('click', () => {
 
 function updateParticipants(list) {
     if (Array.isArray(list)) {
-        dom.participantCount.textContent = `${list.length} online`;
+        state.participants = list;
+        if (dom.participantCount) {
+            dom.participantCount.textContent = `${list.length} online`;
+        }
+        renderParticipantsModal();
     }
 }
+
+function renderParticipantsModal() {
+    if (!dom.participantsList) return;
+
+    const list = Array.isArray(state.participants) && state.participants.length > 0
+        ? state.participants
+        : (state.username ? [{ userId: state.userId, username: state.username }] : []);
+
+    if (dom.modalParticipantsSubtitle) {
+        dom.modalParticipantsSubtitle.textContent = `Sala #${state.room || 'principal'} • ${list.length} online`;
+    }
+
+    dom.participantsList.innerHTML = '';
+
+    list.forEach(p => {
+        const isMe = p.userId === state.userId;
+        const isLive = (isMe && state.isSharing) || state.subscriptions.has(p.userId);
+        const initial = (p.username || '?').trim().charAt(0).toUpperCase() || '?';
+
+        const item = document.createElement('div');
+        item.className = 'participant-item';
+        item.innerHTML = `
+            <div class="participant-info">
+                <div class="participant-avatar">
+                    ${escapeHtml(initial)}
+                    <span class="participant-online-dot"></span>
+                </div>
+                <div class="participant-name">
+                    ${escapeHtml(p.username || 'Anônimo')}
+                    ${isMe ? '<span class="participant-you-tag">(Você)</span>' : ''}
+                </div>
+            </div>
+            ${isLive ? `
+                <span class="participant-live-badge" title="Transmitindo tela agora">
+                    <span class="participant-live-dot"></span>
+                    AO VIVO
+                </span>
+            ` : ''}
+        `;
+        dom.participantsList.appendChild(item);
+    });
+}
+
+function openParticipantsModal() {
+    if (!dom.participantsModal) return;
+    renderParticipantsModal();
+    dom.participantsModal.classList.remove('hidden');
+}
+
+if (dom.openParticipantsBtn) {
+    dom.openParticipantsBtn.addEventListener('click', openParticipantsModal);
+}
+
+if (dom.participantCount) {
+    dom.participantCount.addEventListener('click', openParticipantsModal);
+}
+
+if (dom.closeParticipantsModalBtn && dom.participantsModal) {
+    dom.closeParticipantsModalBtn.addEventListener('click', () => {
+        dom.participantsModal.classList.add('hidden');
+    });
+
+    dom.participantsModal.addEventListener('click', (e) => {
+        if (e.target === dom.participantsModal) {
+            dom.participantsModal.classList.add('hidden');
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !dom.participantsModal.classList.contains('hidden')) {
+            dom.participantsModal.classList.add('hidden');
+        }
+    });
+}
+
+// ==========================================
+// 6.1 Contagem de Usuários nas Salas (Dropdown da Tela de Login)
+// ==========================================
+
+async function fetchRoomsSummary() {
+    if (!dom.roomInput || !dom.modal || dom.modal.classList.contains('hidden')) return;
+    try {
+        const res = await fetch('/api/settings/rooms-summary');
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.rooms) {
+                Array.from(dom.roomInput.options).forEach(opt => {
+                    const roomKey = opt.value;
+                    const baseLabel = opt.getAttribute('data-label') || roomKey;
+                    const count = data.rooms[roomKey] !== undefined ? Number(data.rooms[roomKey]) : 0;
+                    opt.textContent = `${baseLabel} (${count} online)`;
+                });
+            }
+        }
+    } catch (err) {
+        console.debug("Erro ao buscar resumo de salas:", err);
+    }
+}
+
+fetchRoomsSummary();
+setInterval(fetchRoomsSummary, 4000);
 
 function getQualityConstraints() {
     const choice = dom.qualitySelect.value;

@@ -1538,3 +1538,167 @@ svg {
     transform: scale(1.05);
 }
 
+/* =========================================================
+   Dropdown de Seleção de Sala na Tela de Login
+   ========================================================= */
+.room-select-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.login-room-select {
+    width: 100%;
+    padding: 12px 40px 12px 14px;
+    background: #0f1115;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 9px;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 500;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    font-family: inherit;
+}
+
+.login-room-select:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.login-room-select:focus {
+    border-color: #5865f2;
+    box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2);
+}
+
+.login-room-select option {
+    background: #181b22;
+    color: #ffffff;
+    padding: 10px;
+}
+
+/* =========================================================
+   Modal de Usuários na Sala
+   ========================================================= */
+.badge-clickable {
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    user-select: none;
+}
+
+.badge-clickable:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(88, 101, 242, 0.4);
+}
+
+.modal-participants {
+    max-width: 420px;
+    padding: 26px;
+}
+
+.participants-list {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 340px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.participant-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 10px 14px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.participant-item:hover {
+    border-color: rgba(88, 101, 242, 0.4);
+    background: #14171f;
+}
+
+.participant-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.participant-avatar {
+    position: relative;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #5865f2, #7c3aed);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+
+.participant-online-dot {
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--success);
+    border: 2px solid var(--bg-dark);
+}
+
+.participant-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.participant-you-tag {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-left: 4px;
+}
+
+.participant-live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(237, 66, 69, 0.15);
+    border: 1px solid rgba(237, 66, 69, 0.45);
+    color: #ff6b6d;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 999px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.participant-live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #ed4245;
+    box-shadow: 0 0 6px #ed4245;
+}
+
+
