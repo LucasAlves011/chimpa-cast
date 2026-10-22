@@ -949,6 +949,9 @@ async function startScreenShare() {
                 }]
             };
             const transceiver = state.publisherPc.addTransceiver(track, transceiverInit);
+            if (isVideo) {
+                preferHighQualityVideoCodecs(transceiver);
+            }
             transceivers.push({ transceiver, track });
         });
 
@@ -1665,38 +1668,69 @@ function getQualityConstraints() {
             return {
                 video: { width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 60, max: 60 } },
                 fps: 60,
-                maxBitrate: 10_000_000, // 10 Mbps para 1080p60 cristalino
-                minBitrateKbps: 3500,
-                startBitrateKbps: 6500,
-                maxBitrateKbps: 10000
+                maxBitrate: 15_000_000, // 15 Mbps para 1080p60 fiel sem artefatos
+                minBitrateKbps: 5000,
+                startBitrateKbps: 10000,
+                maxBitrateKbps: 15000
             };
         case '1080p30':
             return {
                 video: { width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 30, max: 30 } },
                 fps: 30,
-                maxBitrate: 8_000_000, // 8 Mbps para 1080p30 ultra nítido
-                minBitrateKbps: 2500,
-                startBitrateKbps: 5000,
-                maxBitrateKbps: 8000
+                maxBitrate: 10_000_000, // 10 Mbps para 1080p30 ultra nítido
+                minBitrateKbps: 4000,
+                startBitrateKbps: 7500,
+                maxBitrateKbps: 10000
             };
         case '720p60':
             return {
                 video: { width: { ideal: 1280, max: 1280 }, height: { ideal: 720, max: 720 }, frameRate: { ideal: 60, max: 60 } },
                 fps: 60,
-                maxBitrate: 5_000_000, // 5 Mbps para 720p60
-                minBitrateKbps: 1800,
-                startBitrateKbps: 3500,
-                maxBitrateKbps: 5000
+                maxBitrate: 6_000_000, // 6 Mbps para 720p60
+                minBitrateKbps: 2500,
+                startBitrateKbps: 4500,
+                maxBitrateKbps: 6000
             };
         default:
             return {
                 video: { width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 60, max: 60 } },
                 fps: 60,
-                maxBitrate: 10_000_000,
-                minBitrateKbps: 3500,
-                startBitrateKbps: 6500,
-                maxBitrateKbps: 10000
+                maxBitrate: 15_000_000,
+                minBitrateKbps: 5000,
+                startBitrateKbps: 10000,
+                maxBitrateKbps: 15000
             };
+    }
+}
+
+function preferHighQualityVideoCodecs(transceiver) {
+    try {
+        if (!transceiver || typeof transceiver.setCodecPreferences !== 'function') return;
+        if (!window.RTCRtpSender || typeof RTCRtpSender.getCapabilities !== 'function') return;
+
+        const capabilities = RTCRtpSender.getCapabilities('video');
+        if (!capabilities || !Array.isArray(capabilities.codecs) || capabilities.codecs.length === 0) return;
+
+        const scoreCodec = (c) => {
+            const mime = (c.mimeType || '').toLowerCase();
+            const fmtp = (c.sdpFmtpLine || '').toLowerCase();
+            if (mime === 'video/av1') return 1;
+            if (mime === 'video/vp9') return fmtp.includes('profile-id=0') ? 2 : 3;
+            if (mime === 'video/h264') {
+                // Prioriza High Profile (64...) e Main Profile (4d...) sobre Baseline (42...)
+                if (fmtp.includes('profile-level-id=64')) return 4;
+                if (fmtp.includes('profile-level-id=4d')) return 5;
+                return 6;
+            }
+            if (mime === 'video/vp8') return 7;
+            // Mantém codecs auxiliares de reparo/retransmissão (rtx, red, ulpfec)
+            return 8;
+        };
+
+        const sortedCodecs = [...capabilities.codecs].sort((a, b) => scoreCodec(a) - scoreCodec(b));
+        transceiver.setCodecPreferences(sortedCodecs);
+    } catch (err) {
+        console.debug("Aviso ao definir preferência de codecs:", err);
     }
 }
 
@@ -1712,7 +1746,7 @@ async function applyHighQualitySenderParameters(pc, qualityConfig) {
                 }
                 // Impede o WebRTC de reduzir a resolução de 1080p para 720p/540p
                 params.degradationPreference = 'maintain-resolution';
-                params.encodings[0].maxBitrate = qualityConfig.maxBitrate || 10_000_000;
+                params.encodings[0].maxBitrate = qualityConfig.maxBitrate || 15_000_000;
                 params.encodings[0].maxFramerate = qualityConfig.fps || 60;
                 params.encodings[0].scaleResolutionDownBy = 1.0;
                 params.encodings[0].priority = 'high';
@@ -1727,9 +1761,9 @@ async function applyHighQualitySenderParameters(pc, qualityConfig) {
 
 function boostSdpBitrate(sdp, qualityConfig) {
     if (!sdp) return sdp;
-    const minKbps = qualityConfig.minBitrateKbps || 3500;
-    const startKbps = qualityConfig.startBitrateKbps || 6500;
-    const maxKbps = qualityConfig.maxBitrateKbps || 10000;
+    const minKbps = qualityConfig.minBitrateKbps || 5000;
+    const startKbps = qualityConfig.startBitrateKbps || 10000;
+    const maxKbps = qualityConfig.maxBitrateKbps || 15000;
 
     const lines = sdp.split(/\r?\n/);
     const out = [];
