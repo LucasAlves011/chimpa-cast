@@ -897,10 +897,9 @@ async function startScreenShare() {
             }
         });
 
-        // Otimização crucial: sinaliza para o encoder dar prioridade de movimento (60fps)
         const [videoTrack] = state.localStream.getVideoTracks();
         if (videoTrack) {
-            videoTrack.contentHint = "motion";
+            // Não usar "motion" aqui pois "motion" força o WebRTC a derrubar a resolução de 1080p para 540p/720p (pixelado).
             videoTrack.onended = () => {
                 stopScreenShare();
             };
@@ -928,12 +927,33 @@ async function startScreenShare() {
             iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }]
         });
 
-        // 4. Adiciona tracks no PeerConnection
+        // 4. Adiciona tracks no PeerConnection com parâmetros de alta taxa de bits e resolução travada em 1:1
         const transceivers = [];
         state.localStream.getTracks().forEach((track) => {
-            const transceiver = state.publisherPc.addTransceiver(track, { direction: 'sendonly' });
+            const isVideo = track.kind === 'video';
+            const transceiverInit = isVideo ? {
+                direction: 'sendonly',
+                sendEncodings: [{
+                    maxBitrate: qualityConfig.maxBitrate,
+                    maxFramerate: qualityConfig.fps,
+                    scaleResolutionDownBy: 1.0,
+                    priority: 'high',
+                    networkPriority: 'high'
+                }]
+            } : {
+                direction: 'sendonly',
+                sendEncodings: [{
+                    maxBitrate: 256000,
+                    priority: 'high',
+                    networkPriority: 'high'
+                }]
+            };
+            const transceiver = state.publisherPc.addTransceiver(track, transceiverInit);
             transceivers.push({ transceiver, track });
         });
+
+        // Aplica preferência de manter resolução Full HD nativa (proíbe downscaling automático)
+        await applyHighQualitySenderParameters(state.publisherPc, qualityConfig);
 
         // 5. Gera Oferta SDP local
         const offer = await state.publisherPc.createOffer();
@@ -971,10 +991,22 @@ async function startScreenShare() {
 
         const tracksData = await tracksRes.json();
 
-        // 7. Define a resposta (Answer) da Cloudflare
+        // 7. Define a resposta (Answer) da Cloudflare com boost de bitrate inicial e máximo
         if (tracksData.sessionDescription) {
-            await state.publisherPc.setRemoteDescription(new RTCSessionDescription(tracksData.sessionDescription));
+            try {
+                const boostedSdp = boostSdpBitrate(tracksData.sessionDescription.sdp, qualityConfig);
+                await state.publisherPc.setRemoteDescription(new RTCSessionDescription({
+                    type: tracksData.sessionDescription.type,
+                    sdp: boostedSdp
+                }));
+            } catch (sdpErr) {
+                console.warn("Fallback para SDP padrão da Cloudflare:", sdpErr);
+                await state.publisherPc.setRemoteDescription(new RTCSessionDescription(tracksData.sessionDescription));
+            }
         }
+
+        // Reforça os parâmetros de resolução 1:1 e bitrate máximo após negociação SDP
+        await applyHighQualitySenderParameters(state.publisherPc, qualityConfig);
 
         const currentQualityChoice = dom.qualitySelect ? dom.qualitySelect.value : '1080p60';
         const currentQualityLabel = getQualityFriendlyName(currentQualityChoice);
@@ -1319,18 +1351,6 @@ function renderScreenCard(userId, username, stream, isMuted = false) {
         const video = card.querySelector('video');
         video.srcObject = stream;
 
-        // Ajuste dinâmico de proporção para eliminar bordas pretas (Letterbox/Pillarbox)
-        const updateAspectRatio = () => {
-            if (video.videoWidth && video.videoHeight) {
-                card.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
-            }
-        };
-        video.addEventListener('loadedmetadata', updateAspectRatio);
-        video.addEventListener('resize', updateAspectRatio);
-        if (video.videoWidth && video.videoHeight) {
-            updateAspectRatio();
-        }
-
         const focusBtn = card.querySelector('.focus-btn');
         focusBtn.addEventListener('click', () => {
             if (document.fullscreenElement) {
@@ -1375,16 +1395,6 @@ function renderScreenCard(userId, username, stream, isMuted = false) {
         card.dataset.username = username || '';
         const video = card.querySelector('video');
         video.srcObject = stream;
-        const updateAspectRatio = () => {
-            if (video.videoWidth && video.videoHeight) {
-                card.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
-            }
-        };
-        video.addEventListener('loadedmetadata', updateAspectRatio);
-        video.addEventListener('resize', updateAspectRatio);
-        if (video.videoWidth && video.videoHeight) {
-            updateAspectRatio();
-        }
     }
 }
 
@@ -1649,25 +1659,108 @@ fetchRoomsSummary();
 setInterval(fetchRoomsSummary, 4000);
 
 function getQualityConstraints() {
-    const choice = dom.qualitySelect.value;
+    const choice = dom.qualitySelect ? dom.qualitySelect.value : '1080p60';
     switch (choice) {
         case '1080p60':
             return {
-                video: { width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 60, max: 60 } }
+                video: { width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 60, max: 60 } },
+                fps: 60,
+                maxBitrate: 10_000_000, // 10 Mbps para 1080p60 cristalino
+                minBitrateKbps: 3500,
+                startBitrateKbps: 6500,
+                maxBitrateKbps: 10000
             };
         case '1080p30':
             return {
-                video: { width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 30, max: 30 } }
+                video: { width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 30, max: 30 } },
+                fps: 30,
+                maxBitrate: 8_000_000, // 8 Mbps para 1080p30 ultra nítido
+                minBitrateKbps: 2500,
+                startBitrateKbps: 5000,
+                maxBitrateKbps: 8000
             };
         case '720p60':
             return {
-                video: { width: { ideal: 1280, max: 1280 }, height: { ideal: 720, max: 720 }, frameRate: { ideal: 60, max: 60 } }
+                video: { width: { ideal: 1280, max: 1280 }, height: { ideal: 720, max: 720 }, frameRate: { ideal: 60, max: 60 } },
+                fps: 60,
+                maxBitrate: 5_000_000, // 5 Mbps para 720p60
+                minBitrateKbps: 1800,
+                startBitrateKbps: 3500,
+                maxBitrateKbps: 5000
             };
         default:
             return {
-                video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60 } }
+                video: { width: { ideal: 1920, max: 1920 }, height: { ideal: 1080, max: 1080 }, frameRate: { ideal: 60, max: 60 } },
+                fps: 60,
+                maxBitrate: 10_000_000,
+                minBitrateKbps: 3500,
+                startBitrateKbps: 6500,
+                maxBitrateKbps: 10000
             };
     }
+}
+
+async function applyHighQualitySenderParameters(pc, qualityConfig) {
+    if (!pc) return;
+    const senders = pc.getSenders ? pc.getSenders() : [];
+    for (const sender of senders) {
+        if (sender.track && sender.track.kind === 'video') {
+            try {
+                const params = sender.getParameters();
+                if (!params.encodings || params.encodings.length === 0) {
+                    params.encodings = [{}];
+                }
+                // Impede o WebRTC de reduzir a resolução de 1080p para 720p/540p
+                params.degradationPreference = 'maintain-resolution';
+                params.encodings[0].maxBitrate = qualityConfig.maxBitrate || 10_000_000;
+                params.encodings[0].maxFramerate = qualityConfig.fps || 60;
+                params.encodings[0].scaleResolutionDownBy = 1.0;
+                params.encodings[0].priority = 'high';
+                params.encodings[0].networkPriority = 'high';
+                await sender.setParameters(params);
+            } catch (err) {
+                console.debug("Aviso ao ajustar parâmetros do sender de vídeo:", err);
+            }
+        }
+    }
+}
+
+function boostSdpBitrate(sdp, qualityConfig) {
+    if (!sdp) return sdp;
+    const minKbps = qualityConfig.minBitrateKbps || 3500;
+    const startKbps = qualityConfig.startBitrateKbps || 6500;
+    const maxKbps = qualityConfig.maxBitrateKbps || 10000;
+
+    const lines = sdp.split(/\r?\n/);
+    const out = [];
+    let inVideoSection = false;
+
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+        if (line.startsWith('m=video')) {
+            inVideoSection = true;
+            out.push(line);
+            continue;
+        } else if (line.startsWith('m=')) {
+            inVideoSection = false;
+        }
+
+        if (inVideoSection && line.startsWith('c=IN')) {
+            out.push(line);
+            if (i + 1 < lines.length && !lines[i + 1].startsWith('b=AS:')) {
+                out.push(`b=AS:${maxKbps}`);
+            }
+            continue;
+        }
+
+        if (inVideoSection && line.startsWith('a=fmtp:') && !line.includes('apt=') && !line.includes('x-google-max-bitrate')) {
+            line = `${line};x-google-min-bitrate=${minKbps};x-google-start-bitrate=${startKbps};x-google-max-bitrate=${maxKbps}`;
+        }
+
+        out.push(line);
+    }
+
+    return out.join('\r\n');
 }
 
 function waitForIceGathering(pc) {
