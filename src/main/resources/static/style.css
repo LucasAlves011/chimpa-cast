@@ -1698,18 +1698,26 @@ svg {
 
 
 /* Login com Discord */
-.btn-discord {
+.modal-login .btn-discord {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--primary);
-    color: #fff;
-    text-decoration: none;
+    gap: 10px;
+    margin-top: 0;
     margin-bottom: 14px;
+    text-align: center;
+    text-decoration: none;
 }
 
-.btn-discord:hover {
-    background: var(--primary-hover);
+.modal-login .btn-discord:hover,
+.modal-login .btn-discord:focus,
+.modal-login .btn-discord:active {
+    color: #fff;
+    text-decoration: none;
+}
+
+.discord-logo {
+    flex-shrink: 0;
 }
 
 .discord-chip {
