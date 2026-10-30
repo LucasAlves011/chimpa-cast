@@ -27,8 +27,9 @@ public class SecurityInterceptor implements HandlerInterceptor {
 
         String path = request.getRequestURI();
 
-        // Rotas públicas ou com autenticação própria (estáticos, validação de login, resumo de salas e settings com senha no body)
-        if (path.startsWith("/api/auth/validate")
+        // Rotas públicas ou com autenticação própria (estáticos, login com Discord, resumo de salas e settings com admin key/token)
+        if (path.equals("/api/auth/config")
+                || path.startsWith("/api/auth/discord/")
                 || path.startsWith("/api/settings/remote-kick")
                 || path.startsWith("/api/settings/rooms-summary")
                 || !path.startsWith("/api/")) {
@@ -46,13 +47,10 @@ public class SecurityInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        // 2. Validação por Token de Sessão ou Senha Mestra
+        // 2. Validação do Token de Sessão (emitido no login com Discord)
         String token = request.getHeader("X-Session-Token");
-        String password = request.getHeader("X-Access-Password");
 
-        String credential = (token != null && !token.isBlank()) ? token : password;
-
-        if (!authService.isValidTokenOrPassword(credential)) {
+        if (!authService.isValidToken(token)) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write("{\"error\":\"Acesso negado: token ou credencial inválida!\"}");

@@ -37,6 +37,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(securityInterceptor)
                 .addPathPatterns("/api/**")
-                .excludePathPatterns("/api/auth/validate");
+                .excludePathPatterns("/api/auth/config", "/api/auth/discord/**");
     }
 }

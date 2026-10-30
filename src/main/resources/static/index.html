@@ -28,11 +28,16 @@
 
             <!-- Formulário -->
             <form id="join-form">
-                <div class="form-group">
-                    <label for="username-input">Seu Nickname</label>
-                    <input type="text" id="username-input" placeholder="Ex: Lucas" required maxlength="20" autofocus>
+                <div id="discord-login-block">
+                    <a id="discord-login-btn" class="btn btn-discord btn-block" href="/api/auth/discord/login">Entrar com Discord</a>
+                    <div id="discord-user-chip" class="discord-chip hidden">
+                        <img id="discord-avatar" alt="" width="28" height="28">
+                        <span>Conectado como <strong id="discord-name"></strong></span>
+                        <button type="button" id="discord-logout-btn" class="discord-chip-btn">Trocar</button>
+                    </div>
                 </div>
-                <div class="form-group">
+                <input type="hidden" id="username-input">
+                <div class="form-group hidden" id="join-room-group">
                     <label for="room-input">Sala</label>
                     <div class="room-select-wrapper">
                         <select id="room-input" class="login-room-select" required>
@@ -47,24 +52,8 @@
                         </span>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="password-input">Senha de Acesso</label>
-                    <div class="password-input-wrapper">
-                        <input type="password" id="password-input" placeholder="Digite a senha da plataforma" required>
-                        <button type="button" id="toggle-password-btn" class="toggle-password-btn" title="Mostrar/ocultar senha" aria-label="Mostrar ou ocultar senha">
-                            <svg id="eye-icon" class="svg-icon svg-icon-sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                <circle cx="12" cy="12" r="3"/>
-                            </svg>
-                            <svg id="eye-off-icon" class="svg-icon svg-icon-sm hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                                <line x1="1" y1="1" x2="23" y2="23"/>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
                 <div id="join-error-msg" class="auth-error-msg hidden"></div>
-                <button type="submit" class="btn btn-primary btn-block">Entrar na Sala</button>
+                <button type="submit" id="join-submit-btn" class="btn btn-primary btn-block hidden">Entrar na Sala</button>
             </form>
 
             <div class="modal-footer-note">

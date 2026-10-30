@@ -30,9 +30,8 @@ public class AuthHandshakeInterceptor implements HandshakeInterceptor {
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                    WebSocketHandler wsHandler, Map<String, Object> attributes) {
         String token = null;
-        String password = null;
 
-        // 1. Tenta extrair da Query String (ex: /ws/rooms?token=xyz ou ?password=xyz)
+        // 1. Tenta extrair da Query String (ex: /ws/rooms?token=xyz)
         URI uri = request.getURI();
         if (uri.getQuery() != null) {
             String[] pairs = uri.getQuery().split("&");
@@ -41,8 +40,6 @@ public class AuthHandshakeInterceptor implements HandshakeInterceptor {
                 if (kv.length == 2) {
                     if ("token".equalsIgnoreCase(kv[0])) {
                         token = URLDecoder.decode(kv[1], StandardCharsets.UTF_8);
-                    } else if ("password".equalsIgnoreCase(kv[0])) {
-                        password = URLDecoder.decode(kv[1], StandardCharsets.UTF_8);
                     }
                 }
             }
@@ -52,20 +49,15 @@ public class AuthHandshakeInterceptor implements HandshakeInterceptor {
         if (token == null && request.getHeaders().containsKey("X-Session-Token")) {
             token = request.getHeaders().getFirst("X-Session-Token");
         }
-        if (password == null && request.getHeaders().containsKey("X-Access-Password")) {
-            password = request.getHeaders().getFirst("X-Access-Password");
-        }
 
-        String credential = (token != null && !token.isBlank()) ? token : password;
-
-        if (credential == null || !authService.isValidTokenOrPassword(credential)) {
+        if (token == null || !authService.isValidToken(token)) {
             log.info("Handshake WebSocket não autorizado (sessão ausente ou expirada): {}", uri.getPath());
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return false;
         }
 
         attributes.put("auth_validated", true);
-        attributes.put("credential", credential);
+        attributes.put("credential", token);
         return true;
     }
 

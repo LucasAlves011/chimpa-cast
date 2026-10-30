@@ -16,8 +16,8 @@ const state = {
     userId: getOrCreateUserId(),
     username: '',
     room: 'principal',
-    password: '',
-    sessionToken: sessionStorage.getItem('chimpacast_token') || sessionStorage.getItem('streamflow_token') || '',
+    sessionToken: readStored('chimpacast_token'),
+    discordUser: loadStoredDiscordUser(),
     quotaAvailable: true,
     authFailed: false,
     ws: null,
@@ -42,7 +42,6 @@ const dom = {
     joinForm: document.getElementById('join-form'),
     usernameInput: document.getElementById('username-input'),
     roomInput: document.getElementById('room-input'),
-    passwordInput: document.getElementById('password-input'),
     joinErrorMsg: document.getElementById('join-error-msg'),
     app: document.getElementById('app'),
     displayRoomName: document.getElementById('display-room-name'),
@@ -246,13 +245,11 @@ function getVolumeSvg(vol, isMuted) {
     }
 }
 
-// Requisições HTTP com Cabeçalho de Proteção por Token ou Senha
+// Requisições HTTP com Cabeçalho de Proteção por Token de Sessão
 function fetchWithAuth(url, options = {}) {
     const headers = { ...(options.headers || {}) };
     if (state.sessionToken) {
         headers['X-Session-Token'] = state.sessionToken;
-    } else if (state.password) {
-        headers['X-Access-Password'] = state.password;
     }
     return fetch(url, { ...options, headers });
 }
@@ -284,22 +281,6 @@ if (dom.closeWarningBannerBtn && dom.quotaWarningBanner) {
 if (dom.btnCutoffOk && dom.cutoffModal) {
     dom.btnCutoffOk.addEventListener('click', () => {
         dom.cutoffModal.classList.add('hidden');
-    });
-}
-
-// Alternar visibilidade da senha de acesso
-const togglePasswordBtn = document.getElementById('toggle-password-btn');
-const eyeIcon = document.getElementById('eye-icon');
-const eyeOffIcon = document.getElementById('eye-off-icon');
-
-if (togglePasswordBtn && dom.passwordInput) {
-    togglePasswordBtn.addEventListener('click', () => {
-        const isPassword = dom.passwordInput.getAttribute('type') === 'password';
-        dom.passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
-        if (eyeIcon && eyeOffIcon) {
-            eyeIcon.classList.toggle('hidden', isPassword);
-            eyeOffIcon.classList.toggle('hidden', !isPassword);
-        }
     });
 }
 
@@ -438,89 +419,166 @@ if (dom.btnInactivityStop) {
 // 1. Inicialização e Entrada na Sala
 // ==========================================
 
-dom.joinForm.addEventListener('submit', async (e) => {
+// ------------------------------------------
+// Login com Discord
+// ------------------------------------------
+
+// localStorage pode estar bloqueado (modo privado, política do navegador): nesse caso o login vale só na aba
+function readStored(key) {
+    try {
+        return localStorage.getItem(key) || '';
+    } catch (e) {
+        return '';
+    }
+}
+
+function loadStoredDiscordUser() {
+    try {
+        const raw = readStored('chimpacast_discord');
+        const user = raw ? JSON.parse(raw) : null;
+        return user && user.name ? user : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function clearDiscordSession() {
+    state.discordUser = null;
+    localStorage.removeItem('chimpacast_discord');
+    renderDiscordLoginState();
+}
+
+function renderDiscordLoginState() {
+    const connected = !!(state.discordUser && state.sessionToken);
+    const chip = document.getElementById('discord-user-chip');
+    if (!chip) return;
+
+    if (connected) {
+        document.getElementById('discord-name').textContent = state.discordUser.name;
+        const url = state.discordUser.avatarUrl || '';
+        document.getElementById('discord-avatar').src = url.startsWith('https://cdn.discordapp.com/') ? url : '';
+        dom.usernameInput.value = state.discordUser.name;
+    }
+
+    chip.classList.toggle('hidden', !connected);
+    document.getElementById('discord-login-btn').classList.toggle('hidden', connected);
+    document.getElementById('join-room-group').classList.toggle('hidden', !connected);
+    document.getElementById('join-submit-btn').classList.toggle('hidden', !connected);
+}
+
+async function initDiscordLogin() {
+    let config = { discordLogin: false };
+    try {
+        const res = await fetch('/api/auth/config');
+        if (res.ok) config = await res.json();
+    } catch (e) {
+        console.warn('Não foi possível carregar a configuração de login:', e);
+    }
+
+    if (!config.discordLogin) {
+        document.getElementById('discord-login-btn').classList.add('hidden');
+        showJoinError('O login com Discord não está configurado no servidor. Avise o administrador.');
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const ticket = params.get('discord_ticket');
+    const discordError = params.get('discord_error');
+    if (ticket || discordError) {
+        window.history.replaceState({}, '', window.location.pathname);
+    }
+
+    if (ticket) {
+        try {
+            const res = await fetch('/api/auth/discord/exchange', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ticket })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.valid) {
+                state.sessionToken = data.token;
+                state.discordUser = data.user;
+                state.authFailed = false;
+                localStorage.setItem('chimpacast_token', data.token);
+                localStorage.setItem('chimpacast_discord', JSON.stringify(data.user));
+            } else {
+                showJoinError(data.message || 'Login com Discord expirado. Tente novamente.');
+            }
+        } catch (e) {
+            showJoinError('Não foi possível concluir o login com o Discord.');
+        }
+    } else if (discordError) {
+        const messages = {
+            not_member: 'Você precisa ser membro do servidor do Discord para entrar.',
+            missing_role: 'Seu usuário não tem o cargo necessário para entrar.',
+            rate_limited: 'Muitas tentativas de login! Aguarde 1 minuto.',
+            invalid_request: 'Login com Discord cancelado ou expirado. Tente novamente.'
+        };
+        showJoinError(messages[discordError] || 'Não foi possível entrar com o Discord.');
+    }
+
+    renderDiscordLoginState();
+
+    if (!ticket && state.sessionToken && state.discordUser) {
+        await validateStoredSession();
+    }
+}
+
+// Confirma com o servidor que a sessão salva ainda vale (não expirou, segue membro do servidor)
+async function validateStoredSession() {
+    try {
+        const res = await fetchWithAuth('/api/auth/me');
+        if (res.ok) {
+            const data = await res.json();
+            if (data.valid && data.user) {
+                state.discordUser = data.user;
+                localStorage.setItem('chimpacast_discord', JSON.stringify(data.user));
+            }
+        } else if (res.status === 401 || res.status === 403) {
+            const data = await res.json().catch(() => ({}));
+            state.sessionToken = '';
+            localStorage.removeItem('chimpacast_token');
+            clearDiscordSession();
+            showJoinError(data.message || 'Sua sessão expirou. Entre com o Discord novamente.');
+        }
+    } catch (e) {
+        console.warn('Não foi possível validar a sessão salva:', e);
+    }
+    renderDiscordLoginState();
+}
+
+const discordLogoutBtn = document.getElementById('discord-logout-btn');
+if (discordLogoutBtn) {
+    discordLogoutBtn.addEventListener('click', () => {
+        if (state.sessionToken) {
+            fetchWithAuth('/api/auth/logout', { method: 'POST' }).catch(() => {});
+        }
+        clearDiscordSession();
+        state.sessionToken = '';
+        localStorage.removeItem('chimpacast_token');
+        dom.usernameInput.value = '';
+    });
+}
+
+initDiscordLogin();
+
+dom.joinForm.addEventListener('submit', (e) => {
     e.preventDefault();
     clearJoinError();
 
-    const username = dom.usernameInput.value.trim();
+    if (!(state.discordUser && state.sessionToken)) {
+        showJoinError('Entre com o Discord para continuar.');
+        return;
+    }
+
+    const username = state.discordUser.name;
     const room = dom.roomInput.value.trim().toLowerCase();
-    const password = dom.passwordInput ? dom.passwordInput.value.trim() : '';
+    if (!room) return;
 
-    if (!username || !room) return;
-    if (!password) {
-        showJoinError("Por favor, informe a senha de acesso da plataforma.");
-        return;
-    }
-
-    state.authFailed = false;
-
-    // Feedback visual no botão durante a checagem
-    const submitBtn = dom.joinForm.querySelector('button[type="submit"]');
-    const originalBtnText = submitBtn ? submitBtn.textContent : 'Entrar na Sala';
-    if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Verificando senha...';
-    }
-
-    // 1. Validação prévia da senha no backend
-    try {
-        const authRes = await fetch('/api/auth/validate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password })
-        });
-
-        let authData = {};
-        try {
-            authData = await authRes.json();
-        } catch (jsonErr) {
-            console.warn("Resposta não é JSON:", jsonErr);
-        }
-
-        if (authRes.status === 429) {
-            showJoinError(authData.message || "Muitas tentativas de login! Por favor, aguarde 1 minuto.");
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalBtnText;
-            }
-            return;
-        }
-
-        if (!authRes.ok || !authData.valid) {
-            state.authFailed = true;
-            showJoinError(authData.message || "Senha de acesso incorreta! Verifique com o administrador.");
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalBtnText;
-            }
-            return;
-        }
-
-        // Sucesso na autenticação: armazena APENAS o token opaco de sessão
-        state.sessionToken = authData.token || '';
-        sessionStorage.setItem('chimpacast_token', state.sessionToken);
-        sessionStorage.removeItem('streamflow_token');
-        sessionStorage.removeItem('streamflow_pwd');
-    } catch (err) {
-        console.error("Erro na validação de login:", err);
-        showJoinError("Não foi possível validar as credenciais com o servidor. Verifique se o backend está ativo.");
-        if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalBtnText;
-        }
-        return;
-    } finally {
-        if (submitBtn && !submitBtn.disabled) {
-            submitBtn.textContent = originalBtnText;
-        }
-    }
-
-    // Se chegou aqui, a autenticação foi aprovada pelo backend
     soundManager.init();
 
     state.username = username;
     state.room = room;
-    state.password = password;
     state.authFailed = false;
 
     dom.displayUsername.textContent = username;
@@ -528,11 +586,6 @@ dom.joinForm.addEventListener('submit', async (e) => {
 
     dom.modal.classList.add('hidden');
     dom.app.classList.remove('hidden');
-
-    if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalBtnText;
-    }
 
     connectWebSocket();
     fetchQuota();
@@ -543,9 +596,9 @@ let wsConnectedSuccessfully = false;
 
 function handleSessionExpired(msg) {
     state.authFailed = true;
+    clearDiscordSession();
     state.sessionToken = '';
-    state.password = '';
-    sessionStorage.removeItem('chimpacast_token');
+    localStorage.removeItem('chimpacast_token');
     sessionStorage.removeItem('streamflow_token');
     sessionStorage.removeItem('streamflow_pwd');
     if (state.wsPingInterval) {
@@ -561,7 +614,7 @@ function handleSessionExpired(msg) {
 }
 
 function connectWebSocket() {
-    if (!state.sessionToken && !state.password) {
+    if (!state.sessionToken) {
         console.warn("Nenhuma credencial disponível para WebSocket. Redirecionando para login.");
         handleSessionExpired("Por favor, faça login para entrar na sala.");
         return;
@@ -573,9 +626,7 @@ function connectWebSocket() {
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const authQuery = state.sessionToken
-        ? `?token=${encodeURIComponent(state.sessionToken)}`
-        : (state.password ? `?password=${encodeURIComponent(state.password)}` : '');
+    const authQuery = `?token=${encodeURIComponent(state.sessionToken)}`;
     const wsUrl = `${protocol}//${window.location.host}/ws/rooms${authQuery}`;
 
     dom.statusText.textContent = "Conectando...";
@@ -591,8 +642,7 @@ function connectWebSocket() {
             room: state.room,
             username: state.username,
             userId: state.userId,
-            token: state.sessionToken,
-            password: state.password
+            token: state.sessionToken
         });
 
         // Se estava transmitindo tela durante uma micro-queda do WebSocket, re-anuncia a tela ativa
@@ -664,10 +714,10 @@ function connectWebSocket() {
         }
 
         // Reconecta apenas se o usuário estiver autenticado e na tela da sala
-        if (dom.modal.classList.contains('hidden') && (state.sessionToken || state.password) && !state.authFailed) {
+        if (dom.modal.classList.contains('hidden') && state.sessionToken && !state.authFailed) {
             console.warn(`WebSocket desconectado. Tentativa de reconexão ${reconnectAttempts}/4 em 3s...`);
             setTimeout(() => {
-                if (dom.modal.classList.contains('hidden') && (state.sessionToken || state.password) && !state.authFailed) {
+                if (dom.modal.classList.contains('hidden') && state.sessionToken && !state.authFailed) {
                     connectWebSocket();
                 }
             }, 3000);
@@ -844,9 +894,9 @@ async function handleWsMessage(msg) {
 
         case 'AUTH_ERROR':
             state.authFailed = true;
+            clearDiscordSession();
             state.sessionToken = '';
-            state.password = '';
-            sessionStorage.removeItem('chimpacast_token');
+            localStorage.removeItem('chimpacast_token');
             sessionStorage.removeItem('streamflow_token');
             sessionStorage.removeItem('streamflow_pwd');
             if (state.ws) {
@@ -1890,7 +1940,7 @@ function updateQuotaDisplay(data) {
 }
 
 async function fetchQuota() {
-    if (!state.sessionToken && !state.password) return;
+    if (!state.sessionToken) return;
     try {
         const res = await fetchWithAuth('/api/quota');
         if (res.ok) {
@@ -1966,11 +2016,11 @@ if (btnSyncCloudflare) {
 }
 
 // Inicia busca inicial e monitoramento contínuo da cota (apenas se autenticado)
-if (state.sessionToken || state.password) {
+if (state.sessionToken) {
     fetchQuota();
 }
 setInterval(() => {
-    if (state.sessionToken || state.password) {
+    if (state.sessionToken) {
         fetchQuota();
     }
 }, 5000);

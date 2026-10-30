@@ -1697,3 +1697,54 @@ svg {
 }
 
 
+/* Login com Discord */
+.btn-discord {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary);
+    color: #fff;
+    text-decoration: none;
+    margin-bottom: 14px;
+}
+
+.btn-discord:hover {
+    background: var(--primary-hover);
+}
+
+.discord-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    margin-bottom: 14px;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.discord-chip img {
+    border-radius: 50%;
+}
+
+.discord-chip span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.discord-chip-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 12px;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.discord-chip-btn:hover {
+    color: var(--text-main);
+}

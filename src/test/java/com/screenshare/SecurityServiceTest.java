@@ -1,6 +1,7 @@
 package com.screenshare;
 
 import com.screenshare.service.AuthService;
+import com.screenshare.service.DiscordUser;
 import com.screenshare.service.RateLimitService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,31 +18,19 @@ class SecurityServiceTest {
     @BeforeEach
     void setUp() {
         authService = new AuthService();
-        ReflectionTestUtils.setField(authService, "accessPassword", "amigos123");
         ReflectionTestUtils.setField(authService, "adminKey", "admin_super_secret_9981");
 
         rateLimitService = new RateLimitService();
     }
 
     @Test
-    @DisplayName("Validação de senha deve ser case-sensitive e correta via MessageDigest")
-    void testPasswordValidation() {
-        assertTrue(authService.isValidPassword("amigos123"));
-        assertFalse(authService.isValidPassword("Amigos123"));
-        assertFalse(authService.isValidPassword("senhaErrada"));
-        assertFalse(authService.isValidPassword(null));
-        assertFalse(authService.isValidPassword(""));
-    }
-
-    @Test
     @DisplayName("Geração e ciclo de vida de tokens de sessão efêmeros")
     void testSessionTokenLifecycle() {
-        String token = authService.createSessionToken();
+        String token = authService.createSessionToken(new DiscordUser("1234567", "Lucas", null));
         assertNotNull(token);
         assertFalse(token.isBlank());
 
         assertTrue(authService.isValidToken(token));
-        assertTrue(authService.isValidTokenOrPassword(token));
 
         // Token inexistente
         assertFalse(authService.isValidToken("token-inexistente-12345"));

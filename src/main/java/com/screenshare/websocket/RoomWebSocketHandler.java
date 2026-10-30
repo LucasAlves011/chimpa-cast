@@ -23,6 +23,7 @@ public class RoomWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final com.screenshare.service.AuthService authService;
     private final com.screenshare.service.RoomSettingsService roomSettingsService;
+    private final com.screenshare.service.DiscordService discordService;
 
     // Sessão WebSocket -> Metadados do Usuário
     private final Map<String, UserSession> sessions = new ConcurrentHashMap<>();
@@ -37,12 +38,15 @@ public class RoomWebSocketHandler extends TextWebSocketHandler {
     private final Map<String, Long> lastChatTimestamps = new ConcurrentHashMap<>();
 
     public RoomWebSocketHandler(com.screenshare.service.AuthService authService,
-                                com.screenshare.service.RoomSettingsService roomSettingsService) {
+                                com.screenshare.service.RoomSettingsService roomSettingsService,
+                                com.screenshare.service.DiscordService discordService) {
         this.authService = authService;
         this.roomSettingsService = roomSettingsService;
+        this.discordService = discordService;
     }
 
-    public record UserSession(String userId, String username, String roomId, WebSocketSession session) {}
+    public record UserSession(String userId, String username, String roomId, WebSocketSession session,
+                              com.screenshare.service.DiscordUser discordUser) {}
     public record ScreenInfo(String userId, String username, String sessionId, String quality, List<Map<String, Object>> tracks) {}
     public record ActiveRoomStats(int totalActiveScreens, int totalActiveViewers, double currentRateBytesPerSecond) {}
 
@@ -190,14 +194,24 @@ public class RoomWebSocketHandler extends TextWebSocketHandler {
 
     private void handleJoinRoom(WebSocketSession session, JsonNode json) throws IOException {
         String token = json.path("token").asText("").trim();
-        String password = json.path("password").asText("").trim();
-        String credential = !token.isEmpty() ? token : password;
+        com.screenshare.service.DiscordUser discordUser = authService.getDiscordUser(token);
 
-        if (!authService.isValidTokenOrPassword(credential)) {
-            log.warn("Conexão rejeitada no JOIN_ROOM: credencial ausente ou inválida para a sessão {}", session.getId());
+        if (discordUser == null) {
+            log.warn("Conexão rejeitada no JOIN_ROOM: sessão do Discord ausente ou inválida para a sessão {}", session.getId());
             sendJson(session, Map.of(
                     "type", "AUTH_ERROR",
-                    "message", "Acesso rejeitado: credencial de acesso ausente ou inválida!"
+                    "message", "Acesso rejeitado: faça login com o Discord para entrar."
+            ));
+            session.close(new CloseStatus(4001, "Credencial Incorreta"));
+            return;
+        }
+
+        if (!discordService.verifyMembership(discordUser.id())) {
+            log.warn("Conexão rejeitada no JOIN_ROOM: [{}] não é mais membro do servidor do Discord", discordUser.name());
+            authService.revokeToken(token);
+            sendJson(session, Map.of(
+                    "type", "AUTH_ERROR",
+                    "message", "Você não faz mais parte do servidor do Discord."
             ));
             session.close(new CloseStatus(4001, "Credencial Incorreta"));
             return;
@@ -206,8 +220,8 @@ public class RoomWebSocketHandler extends TextWebSocketHandler {
         String roomId = json.path("room").asText("default").trim().toLowerCase();
         if (roomId.length() > 30) roomId = roomId.substring(0, 30);
 
-        String rawUsername = json.path("username").asText("Anônimo").trim();
-        String username = sanitizeUsername(rawUsername);
+        // O nome vem da identidade verificada do Discord e não do que o cliente enviou
+        String username = sanitizeUsername(discordUser.name());
         String userId = json.path("userId").asText(UUID.randomUUID().toString());
 
         Set<WebSocketSession> roomSet = rooms.computeIfAbsent(roomId, k -> new CopyOnWriteArraySet<>());
@@ -266,7 +280,7 @@ public class RoomWebSocketHandler extends TextWebSocketHandler {
             }
         }
 
-        UserSession userSession = new UserSession(userId, username, roomId, session);
+        UserSession userSession = new UserSession(userId, username, roomId, session, discordUser);
         sessions.put(session.getId(), userSession);
         roomSet.add(session);
 
@@ -333,8 +347,14 @@ public class RoomWebSocketHandler extends TextWebSocketHandler {
             }
         }
 
+        boolean alreadySharing = screens.containsKey(user.userId());
         ScreenInfo screen = new ScreenInfo(user.userId(), user.username(), callsSessionId, quality, tracksList);
         screens.put(user.userId(), screen);
+
+        if (!alreadySharing) {
+            discordService.notifyScreenStarted(user.discordUser().id(), user.username(),
+                    user.discordUser().avatarUrl(), user.roomId(), quality);
+        }
 
         log.info("Usuário [{}] iniciou compartilhamento de tela na sala [{}] (qualidade: {}) com sessionId: {}", 
                 user.username(), user.roomId(), quality, callsSessionId);

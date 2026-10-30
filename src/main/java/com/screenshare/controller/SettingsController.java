@@ -42,28 +42,26 @@ public class SettingsController {
     @PostMapping("/remote-kick")
     public ResponseEntity<Map<String, Object>> updateRemoteKickStatus(
             @RequestBody Map<String, Object> body,
-            @RequestHeader(value = "X-Access-Password", required = false) String headerPassword,
+            @RequestHeader(value = "X-Session-Token", required = false) String headerToken,
             @RequestHeader(value = "X-Admin-Key", required = false) String headerAdminKey) {
 
-        // Extrai a senha ou chave (pode vir no corpo JSON ou nos cabeçalhos HTTP)
-        String password = body.get("password") != null ? String.valueOf(body.get("password")).trim() : "";
+        // Extrai o token de sessão ou a chave de admin (corpo JSON ou cabeçalhos HTTP)
+        String token = body.get("token") != null ? String.valueOf(body.get("token")).trim() : "";
         String adminKey = body.get("adminKey") != null ? String.valueOf(body.get("adminKey")).trim() : "";
 
-        if (password.isEmpty() && headerPassword != null) {
-            password = headerPassword.trim();
+        if (token.isEmpty() && headerToken != null) {
+            token = headerToken.trim();
         }
         if (adminKey.isEmpty() && headerAdminKey != null) {
             adminKey = headerAdminKey.trim();
         }
 
-        boolean authorized = authService.isValidPassword(password) || 
-                             authService.isValidAdminKey(adminKey) ||
-                             authService.isValidToken(password);
+        boolean authorized = authService.isValidAdminKey(adminKey) || authService.isValidToken(token);
 
         if (!authorized) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
                     "success", false,
-                    "error", "Credencial inválida: informe a senha da aplicação ou a admin key para alterar esta configuração."
+                    "error", "Credencial inválida: faça login com o Discord ou informe a admin key para alterar esta configuração."
             ));
         }
 
